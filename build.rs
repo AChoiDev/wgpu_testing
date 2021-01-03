@@ -1,6 +1,5 @@
 fn main() {
-    println!("cargo:rerun-if-changed=src/shaders");
-
+    println!("cargo:rerun-if-changed=src/shaders/*");
     std::fs::create_dir_all("src/spirv").unwrap();
 
     let mut compiler = shaderc::Compiler::new().unwrap();
