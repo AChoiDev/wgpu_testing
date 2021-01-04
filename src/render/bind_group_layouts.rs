@@ -2,6 +2,7 @@
 pub struct BindGroupLayouts {
     pub process: wgpu::BindGroupLayout,
     pub trace: wgpu::BindGroupLayout,
+    pub edit_sum_table: wgpu::BindGroupLayout,
 }
 
 impl BindGroupLayouts {
@@ -22,9 +23,35 @@ impl BindGroupLayouts {
                         entries: &make_process_compute_entries(),
                             
                     }
-                ),
+               ),
+            edit_sum_table:
+                device.create_bind_group_layout(
+                    &wgpu::BindGroupLayoutDescriptor {
+                        label: None,
+                        entries: &make_process_sum_entries(),
+                    }
+               ),
+               
         }
     }
+}
+
+fn make_process_sum_entries()
+-> Vec<wgpu::BindGroupLayoutEntry> {
+    make_compute_entries(
+        vec![
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R8Uint,
+                readonly: true,
+            },
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R16Uint,
+                readonly: false,
+            },
+        ]
+    )
 }
 
 fn make_process_compute_entries()
@@ -56,6 +83,11 @@ fn make_trace_compute_entries()
             wgpu::BindingType::StorageTexture {
                 dimension: wgpu::TextureViewDimension::D3,
                 format: wgpu::TextureFormat::R8Uint,
+                readonly: true,
+            },
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R16Uint,
                 readonly: true,
             },
             wgpu::BindingType::UniformBuffer {

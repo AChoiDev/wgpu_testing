@@ -3,6 +3,7 @@ pub struct ByteGrid {
     length: usize,
 }
 
+#[allow(dead_code)]
 impl ByteGrid {
 
     pub fn length(&self) 

@@ -1,21 +1,13 @@
-use render_context::RenderDescriptor;
+use render::render_context::RenderDescriptor;
 
 pub const WINDOW_SIZE: u32 = 1024;
 
-mod resources;
-mod pipelines;
-mod bind_group_layouts;
-mod bind_groups;
-mod render_context;
 mod byte_grid;
-mod imgui;
-mod shader_modules;
-mod shader_data;
+mod render;
 
 use nalgebra as na;
 
 fn main() {
-
     let event_loop = winit::event_loop::EventLoop::new();
 
     let window =
@@ -26,7 +18,7 @@ fn main() {
         .unwrap();
         
 
-    let mut render_context = render_context::RenderContext::new(&window);
+    let mut render_context = render::render_context::RenderContext::new(&window);
 
     let mut input = winit_input_helper::WinitInputHelper::new();
 
@@ -34,7 +26,6 @@ fn main() {
 
     let mut frame_count = 0u32;
     let mut frame_time = std::time::Instant::now();
-
 
     let mut orientation = na::UnitQuaternion::<f32>::identity();
 
@@ -90,9 +81,9 @@ fn fill_voxel(coords: [usize ; 3], frame: u32)
     let mag_sqr = disp[0] * disp[0] + disp[1] * disp[1] + disp[2] * disp[2];
 
     if mag_sqr < 18i32.pow(2) && ((frame / 20) % 2 == 0 || 31 - coords[1] > 6) {
-        0
+        255 // not filled
     } 
     else {
-        1
+        0 // filled
     }
 }

@@ -4,9 +4,10 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, r11f_g11f_b10f) uniform image2D outputColor;
 layout(set = 0, binding = 1, r8ui) uniform readonly uimage3D map;
+layout(set = 0, binding = 2, r16ui) uniform readonly uimage3D sumMap;
 
 //p1 => padding1
-layout(set = 0, binding = 2) uniform Frame {
+layout(set = 0, binding = 3) uniform Frame {
     vec3 right;             
       int p1;
     vec3 up;                
@@ -52,8 +53,7 @@ vec3 PlaneMarch(vec3 p0, vec3 d) {
       return p;
     }
 
-    ivec3 mapPos = ivec3(p);
-    if (imageLoad(map, mapPos).r != 0) {
+    if (imageLoad(map, ivec3(p)).r != 255) {
       return p;
     }
     
@@ -77,5 +77,9 @@ void main() {
     colorResult = vec4(exp(-rayLength * 0.205));
     
     imageStore(outputColor, pixel_pos, colorResult);
-    // imageStore(outputColor, pixel_pos, vec4(up.xyz, 1.0));
+    
+    uint sumValue = imageLoad(sumMap, ivec3(pixel_pos.x % 32, pixel_pos.y % 32, ((pixel_pos.x + pixel_pos.y) / 32) % 32)).r;
+
+    imageStore(outputColor, pixel_pos, vec4(float(sumValue) / 2, 0.0, 0.0, 1.0));
 }
+

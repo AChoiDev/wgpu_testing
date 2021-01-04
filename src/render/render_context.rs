@@ -12,11 +12,11 @@ pub struct RenderContext {
     surface: wgpu::Surface,
     swapchain: wgpu::SwapChain,
 
-    bind_groups: crate::bind_groups::BindGroups,
-    pipelines: crate::pipelines::Pipelines,
-    resources: crate::resources::Resources,
+    bind_groups: super::bind_groups::BindGroups,
+    pipelines: super::pipelines::Pipelines,
+    resources: super::resources::Resources,
 
-    imgui_renderer: crate::imgui::ImguiRenderer,
+    imgui_renderer: super::imgui::ImguiRenderer,
 }
 
 impl RenderContext {
@@ -59,24 +59,25 @@ impl RenderContext {
         let swapchain = 
             device.create_swap_chain(&surface, &swapchain_descriptor);
 
-    let bind_group_layouts = crate::bind_group_layouts::BindGroupLayouts::new(&device);
+    let bind_group_layouts = super::bind_group_layouts::BindGroupLayouts::new(&device);
 
         
-    let resources = crate::resources::Resources::new(&device);
+    let resources = super::resources::Resources::new(&device);
        
     
     let pipelines = 
-        crate::pipelines::Pipelines::new(&device, &bind_group_layouts, &swapchain_descriptor);
+        super::pipelines::Pipelines::new(&device, &bind_group_layouts, &swapchain_descriptor);
 
+    let views = super::resources::ResourceViews::new(&resources);
 
     let bind_groups = 
-        crate::bind_groups::BindGroups::new(
+        super::bind_groups::BindGroups::new(
             &device, 
             &bind_group_layouts, 
-            &resources
+            &views
         );
     let imgui_renderer =
-        crate::imgui::ImguiRenderer::new(&queue, &device, &swapchain_descriptor, &window);
+        super::imgui::ImguiRenderer::new(&queue, &device, &swapchain_descriptor, &window);
 
         Self {
             instance,
@@ -121,14 +122,25 @@ impl RenderContext {
             }
         );
 
+
         {
-            let data = crate::shader_data::trace_frame::make_bytes(render_desc.cam_orientation, 100f32);
+            let data = super::shader_data::trace_frame::make_bytes(
+                render_desc.cam_orientation, 100f32);
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
+
         {
             let mut cpass = encoder.begin_compute_pass();
+            
+            cpass.set_pipeline(&self.pipelines.fill_sum_table);
+            cpass.set_bind_group(0, &self.bind_groups.edit_sum_table, &[]);
+            cpass.dispatch(8, 8, 8);
+        }
 
+
+        {
+            let mut cpass = encoder.begin_compute_pass();
 
             cpass.set_pipeline(&self.pipelines.trace);
             cpass.set_bind_group(0, &self.bind_groups.trace, &[]);

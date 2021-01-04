@@ -1,0 +1,17 @@
+
+#version 460 core
+layout (local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(set = 0, binding = 0, r8ui) uniform readonly uimage3D map;
+layout(set = 0, binding = 1, r16ui) uniform uimage3D sumMap;
+
+void main() {
+    ivec3 invoc = ivec3(gl_GlobalInvocationID.xyz);
+
+    uint value = 0;
+    if (imageLoad(map, invoc).r != 255) {
+        value = 1;
+    }
+
+    imageStore(sumMap, invoc, uvec4(value, 0, 0, 0));
+}

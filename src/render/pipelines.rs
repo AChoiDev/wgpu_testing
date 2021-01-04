@@ -1,8 +1,10 @@
-use crate::bind_group_layouts::BindGroupLayouts;
+use super::bind_group_layouts::BindGroupLayouts;
 
 pub struct Pipelines {
     pub process: wgpu::RenderPipeline,
     pub trace: wgpu::ComputePipeline,
+    pub fill_sum_table: wgpu::ComputePipeline,
+    //pub fill_sum_table: wgpu::ComputePipeline,
 }
 
 
@@ -11,56 +13,93 @@ impl Pipelines {
             sc_desc: &wgpu::SwapChainDescriptor)
     -> Self {
 
-        let modules = crate::shader_modules::ShaderModules::new(&device);
+        Self {
+            trace:
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/gradient.comp.spv"),
+                    &device,
+                    &[
+                        &bind_group_layouts.trace,
+                    ]
+                ),
+            process:
+                make_process_pipeline(&device, &sc_desc, 
+                    &[
+                        &bind_group_layouts.process
+                    ]
+                ),
+            fill_sum_table:
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/fill_sum_table.comp.spv"),
+                    &device,
+                    &[
+                        &bind_group_layouts.edit_sum_table,
+                    ]
+                ),
+        }
+    }
+}
 
-    let compute_pipeline_layout = 
+
+fn make_compute_pipeline(source: wgpu::ShaderModuleSource, device: &wgpu::Device, bind_group_layouts: &[&wgpu::BindGroupLayout])
+-> wgpu::ComputePipeline {
+
+    let layout = 
         device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {
                 label: None,
-                bind_group_layouts:
-                    &[
-                        &bind_group_layouts.trace,
-                    ],
+                bind_group_layouts,
                 push_constant_ranges: &[],
             }
         );
 
-    let compute_pipeline = device.create_compute_pipeline(
+    device.create_compute_pipeline(
         &wgpu::ComputePipelineDescriptor {
             label: None,
-            layout: Some(&compute_pipeline_layout),
+            layout: Some(&layout),
             compute_stage: wgpu::ProgrammableStageDescriptor {
-                module: &modules.gradient_comp,
+                module: 
+                    &device.create_shader_module(
+                        source,
+                    ),
                 entry_point: "main",
             },
         }
-    );
-    let process_pipeline_layout = 
+    )
+}
+
+fn make_process_pipeline(device: &wgpu::Device, 
+    sc_desc: &wgpu::SwapChainDescriptor,
+    bind_group_layouts: &[&wgpu::BindGroupLayout]) 
+-> wgpu::RenderPipeline {
+    let layout = 
         device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {
                 label: None,
-                bind_group_layouts:
-                    &[
-                        &bind_group_layouts.process,
-                    ],
+                bind_group_layouts,
                 push_constant_ranges: &[],
             }
         );
 
-   
-    let process_pipeline = device.create_render_pipeline(
+    device.create_render_pipeline(
         &wgpu::RenderPipelineDescriptor {
             label: None,
-            layout: Some(&process_pipeline_layout),
+            layout: Some(&layout),
             vertex_stage: 
                 wgpu::ProgrammableStageDescriptor {
-                    module: &modules.screen_vert,
+                    module:
+                        &device.create_shader_module(
+                            wgpu::include_spirv!("../spirv/screen.vert.spv")
+                        ),
                     entry_point: "main"
                 },
             fragment_stage:
                 Some(
                     wgpu::ProgrammableStageDescriptor {
-                        module: &modules.process_frag,
+                        module:
+                            &device.create_shader_module(
+                                wgpu::include_spirv!("../spirv/process.frag.spv")
+                            ),
                         entry_point: "main"
                     }
                 ),
@@ -85,11 +124,5 @@ impl Pipelines {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         },
-    );
-
-        Self {
-            trace: compute_pipeline,
-            process: process_pipeline,
-        }
-    }
+    )
 }

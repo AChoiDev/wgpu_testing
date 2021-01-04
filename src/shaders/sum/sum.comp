@@ -1,0 +1,26 @@
+#version 460 core
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 1, r16ui) uniform uimage3D sumMap;
+
+void main() {
+    ivec2 invoc = ivec2(gl_GlobalInvocationID.xy);
+
+    uint previous = imageLoad(sumMap, ivec3(SWIZ_INIT)).r;
+    // SWIZ_INIT (possibilities)
+    // invoc.x, invoc.y, 0
+    // invoc.x, 0, invoc.z
+    // 0, invoc.y, invoc.z;
+
+    for(int i = 1; i < 32; i++) {
+        ivec3 target = ivec3(SWIZ_INDEX);
+        // SWIZ_INDEX (possibilities)
+        // invoc.x, invoc.y, i;
+        // invoc.x, i, invoc.z;
+        // i, invoc.y, invoc.z;
+        uint current = imageLoad(sumMap, target).r;
+        uint new = previous + current;
+        imageStore(sumMap, target, uvec4(new));
+        previous = new;
+    }
+}

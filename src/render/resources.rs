@@ -1,11 +1,39 @@
 use wgpu::util::DeviceExt;
 
+pub struct ResourceViews<'a> {
+    pub color: wgpu::TextureView,
+    pub map: wgpu::TextureView,
+    pub trace_frame: wgpu::BufferSlice<'a>,
+    pub sum_map: wgpu::TextureView,
+}
+
+impl<'a> ResourceViews<'a> {
+    pub fn new(resources: &'a Resources)
+    -> Self {
+        Self {
+            color:
+                resources.render_textures.color
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+            map:
+                resources.map_texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+            trace_frame:
+                resources.buffers.trace_frame
+                .slice(..),
+            sum_map:
+                resources.sum_texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+        }
+    }
+}
+
+
 pub struct Resources {
     pub render_textures: RenderTextures,
     pub map_texture: wgpu::Texture,
+    pub sum_texture: wgpu::Texture,
     pub buffers: Buffers,
 }
-
 
 impl Resources {
     pub fn map_texture_copy_view(&self) 
@@ -17,19 +45,31 @@ impl Resources {
             }
     }
 
-    pub fn map_texture(&self) 
-    -> wgpu::TextureView {
-        self.map_texture.create_view(
-            &wgpu::TextureViewDescriptor::default(),
-        )
-    }
-
     pub fn new(device: &wgpu::Device) 
     -> Self {
         let render_textures = 
             RenderTextures::new(&device);
         let buffers = 
             Buffers::new(&device);
+        let sum_texture = 
+            device.create_texture(
+                &wgpu::TextureDescriptor {
+                    label: None,
+                    size: 
+                        wgpu::Extent3d {
+                            width: 33,
+                            height: 33,
+                            depth: 33,
+                        },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D3,
+                    format: wgpu::TextureFormat::R16Uint,
+                    usage:
+                        wgpu::TextureUsage::STORAGE,
+                }
+            );
+
         let map_texture = 
             device.create_texture(
                 &wgpu::TextureDescriptor {
@@ -55,29 +95,21 @@ impl Resources {
             render_textures,
             buffers,
             map_texture,
+            sum_texture,
         }
 
     }
 }
 
 
+#[allow(dead_code)]
 pub struct RenderTextures {
     color: wgpu::Texture,
     depth: wgpu::Texture,
+    cone_depth: wgpu::Texture,
 }
 
 impl RenderTextures {
-
-    
-    pub fn color(&self) 
-    -> wgpu::TextureView {
-        self.color.create_view(&wgpu::TextureViewDescriptor::default())
-    }
-    pub fn depth(&self)
-    -> wgpu::TextureView {
-        self.depth.create_view(&wgpu::TextureViewDescriptor::default())
-    }
-
     pub fn new(device: &wgpu::Device)
     -> Self {
 
@@ -85,11 +117,11 @@ impl RenderTextures {
             wgpu::TextureDescriptor {
                 label: None,
                 size: 
-                wgpu::Extent3d {
-                    width: crate::WINDOW_SIZE,
-                    height: crate::WINDOW_SIZE,
-                    depth: 1,
-                },
+                    wgpu::Extent3d {
+                        width: crate::WINDOW_SIZE,
+                        height: crate::WINDOW_SIZE,
+                        depth: 1,
+                    },
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -113,9 +145,26 @@ impl RenderTextures {
                         ..trace_texture_descriptor_base
                     }
                 ),               
-
+            cone_depth:
+                device.create_texture(
+                    &wgpu::TextureDescriptor {
+                        format: wgpu::TextureFormat::R32Float,
+                        size: 
+                            wgpu::Extent3d {
+                                width: round_up_div(crate::WINDOW_SIZE, 8),
+                                height: round_up_div(crate::WINDOW_SIZE, 8),
+                                depth: 1,
+                            },
+                        ..trace_texture_descriptor_base
+                    }
+                ),
         }
     }
+}
+
+fn round_up_div(val: u32, divisor: u32) 
+-> u32 {
+    (val + divisor - 1) / divisor
 }
 
 pub struct Buffers {
@@ -149,13 +198,9 @@ impl Buffers {
                 },
             );
 
-
         Self {
             screen_quad,
             trace_frame,
         }
     }
 }
-
-
-
