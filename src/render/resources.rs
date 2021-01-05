@@ -27,7 +27,6 @@ impl<'a> ResourceViews<'a> {
     }
 }
 
-
 pub struct Resources {
     pub render_textures: RenderTextures,
     pub map_texture: wgpu::Texture,
@@ -100,7 +99,6 @@ impl Resources {
 
     }
 }
-
 
 #[allow(dead_code)]
 pub struct RenderTextures {

@@ -13,5 +13,5 @@ void main() {
         value = 1;
     }
 
-    imageStore(sumMap, invoc, uvec4(value, 0, 0, 0));
+    imageStore(sumMap, invoc + ivec3(1, 1, 1), uvec4(value, 0, 0, 0));
 }

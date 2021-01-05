@@ -4,9 +4,8 @@ pub struct Pipelines {
     pub process: wgpu::RenderPipeline,
     pub trace: wgpu::ComputePipeline,
     pub fill_sum_table: wgpu::ComputePipeline,
-    //pub fill_sum_table: wgpu::ComputePipeline,
+    pub sum_table_passes: Vec<wgpu::ComputePipeline>,
 }
-
 
 impl Pipelines {
     pub fn new(device: &wgpu::Device, bind_group_layouts : &BindGroupLayouts, 
@@ -36,8 +35,28 @@ impl Pipelines {
                         &bind_group_layouts.edit_sum_table,
                     ]
                 ),
+            sum_table_passes: make_sum_table_passes(&device, &bind_group_layouts)
         }
     }
+}
+
+fn make_sum_table_passes(device: &wgpu::Device, bind_group_layouts: &BindGroupLayouts) 
+-> Vec<wgpu::ComputePipeline> {
+    vec![
+        wgpu::include_spirv!("../spirv/sum_0.comp.spv"),
+        wgpu::include_spirv!("../spirv/sum_1.comp.spv"),
+        wgpu::include_spirv!("../spirv/sum_2.comp.spv"),
+    ]
+    .into_iter()
+    .map(|source|
+        make_compute_pipeline(
+            source,
+            &device,
+            &[
+                &bind_group_layouts.edit_sum_table,
+            ]
+        ),
+    ).collect()
 }
 
 

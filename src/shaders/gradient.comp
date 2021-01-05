@@ -77,9 +77,5 @@ void main() {
     colorResult = vec4(exp(-rayLength * 0.205));
     
     imageStore(outputColor, pixel_pos, colorResult);
-    
-    uint sumValue = imageLoad(sumMap, ivec3(pixel_pos.x % 32, pixel_pos.y % 32, ((pixel_pos.x + pixel_pos.y) / 32) % 32)).r;
-
-    imageStore(outputColor, pixel_pos, vec4(float(sumValue) / 2, 0.0, 0.0, 1.0));
 }
 

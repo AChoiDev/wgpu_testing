@@ -30,7 +30,7 @@ fn swizzle_option<'a>(axis: &Axis)
     };
 
     shaderc::CompileOptions::add_macro_definition(&mut option, 
-        "SWIZ_INIT", Some(base.replace("{}", "0").as_str()));
+        "SWIZ_INIT", Some(base.replace("{}", "1").as_str()));
     shaderc::CompileOptions::add_macro_definition(&mut option, 
         "SWIZ_INDEX", Some(base.replace("{}", "i").as_str()));
 
@@ -54,7 +54,7 @@ pub fn make_write_inputs_sum_shader()
                 "main", 
                 Some(&option)
             ).unwrap().as_binary_u8().to_vec(),
-            "src/spirv/sum_{}.spv".replace("{}", i.to_string().as_str()),
+            "src/spirv/sum_{}.comp.spv".replace("{}", i.to_string().as_str()),
         )
     ).collect()
 }

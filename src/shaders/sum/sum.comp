@@ -8,11 +8,11 @@ void main() {
 
     uint previous = imageLoad(sumMap, ivec3(SWIZ_INIT)).r;
     // SWIZ_INIT (possibilities)
-    // invoc.x, invoc.y, 0
-    // invoc.x, 0, invoc.z
-    // 0, invoc.y, invoc.z;
+    // invoc.x, invoc.y, 1
+    // invoc.x, 1, invoc.z
+    // 1, invoc.y, invoc.z;
 
-    for(int i = 1; i < 32; i++) {
+    for(int i = 2; i < 33; i++) {
         ivec3 target = ivec3(SWIZ_INDEX);
         // SWIZ_INDEX (possibilities)
         // invoc.x, invoc.y, i;

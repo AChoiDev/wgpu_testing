@@ -129,7 +129,7 @@ impl RenderContext {
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
-
+        // fill the sum table with 1s corresponding to the map texture
         {
             let mut cpass = encoder.begin_compute_pass();
             
@@ -138,6 +138,17 @@ impl RenderContext {
             cpass.dispatch(8, 8, 8);
         }
 
+        // sum table computations
+        {
+            self.pipelines.sum_table_passes
+            .iter()
+            .for_each(|pipeline| {
+                let mut cpass = encoder.begin_compute_pass();
+                cpass.set_pipeline(pipeline);
+                cpass.set_bind_group(0, &self.bind_groups.edit_sum_table, &[]);
+                cpass.dispatch(4, 4, 1);
+            });
+        }
 
         {
             let mut cpass = encoder.begin_compute_pass();
