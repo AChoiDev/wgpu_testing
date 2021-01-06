@@ -1,4 +1,4 @@
-#version 450
+#version 460 core
 
 layout(location = 0) in vec2 tex_coords;
 layout(location = 0) out vec4 color_out;

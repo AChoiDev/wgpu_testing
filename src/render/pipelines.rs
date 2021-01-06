@@ -18,7 +18,7 @@ impl Pipelines {
                     wgpu::include_spirv!("../spirv/gradient.comp.spv"),
                     &device,
                     &[
-                        &bind_group_layouts.trace,
+                        &bind_group_layouts.march,
                     ]
                 ),
             process:

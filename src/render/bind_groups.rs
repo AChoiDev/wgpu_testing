@@ -16,7 +16,7 @@ impl BindGroups {
                 device.create_bind_group(
                     &wgpu::BindGroupDescriptor {
                         label: None,
-                        layout: &bind_group_layouts.trace,
+                        layout: &bind_group_layouts.march,
                         entries: &make_trace_entries(&views)
                     }
                 ),

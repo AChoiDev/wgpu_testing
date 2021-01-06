@@ -1,7 +1,7 @@
 
 pub struct BindGroupLayouts {
     pub process: wgpu::BindGroupLayout,
-    pub trace: wgpu::BindGroupLayout,
+    pub march: wgpu::BindGroupLayout,
     pub edit_sum_table: wgpu::BindGroupLayout,
 }
 
@@ -9,7 +9,7 @@ impl BindGroupLayouts {
     pub fn new(device: &wgpu::Device)
     -> Self {
         Self {
-            trace:
+            march:
                 device.create_bind_group_layout(
                     &wgpu::BindGroupLayoutDescriptor {
                         label: None,

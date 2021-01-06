@@ -2,12 +2,11 @@
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(set = 0, binding = 0, r11f_g11f_b10f) uniform image2D outputColor;
-layout(set = 0, binding = 1, r8ui) uniform readonly uimage3D map;
-layout(set = 0, binding = 2, r16ui) uniform readonly uimage3D sumMap;
+layout(set = 0, binding = 0, r16ui) uniform readonly uimage3D sumMap;
+layout(set = 0, binding = 1, r32f) uniform image2D outputDepth;
 
 //p1 => padding1
-layout(set = 0, binding = 3) uniform Frame {
+layout(set = 1, binding = 0) uniform Frame {
     vec3 right;             
       int p1;
     vec3 up;                
@@ -18,8 +17,10 @@ layout(set = 0, binding = 3) uniform Frame {
       vec3 p4;
 };
 
+layout(set = 2, binding = 0, r8ui) uniform readonly uimage3D map;
+
 vec3 getRayDirection(vec3 lookAt, ivec2 pixelCoords) {
-    vec2 resolution = imageSize(outputColor);
+    vec2 resolution = imageSize(outputDepth);
     float ratio = resolution.x / resolution.y;
 
     vec3 baseDir = normalize(
@@ -74,8 +75,7 @@ void main() {
     vec3 endPos = PlaneMarch(vec3(15), getRayDirection(vec3(0.0, 0.0, 1.0), pixel_pos));
 
     float rayLength = length(endPos - vec3(15));
-    colorResult = vec4(exp(-rayLength * 0.205));
     
-    imageStore(outputColor, pixel_pos, colorResult);
+    imageStore(outputDepth, pixel_pos, vec4(rayLength));
 }
 
