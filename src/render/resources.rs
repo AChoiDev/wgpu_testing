@@ -153,8 +153,8 @@ impl RenderTextures {
                         format: wgpu::TextureFormat::R32Float,
                         size: 
                             wgpu::Extent3d {
-                                width: round_up_div(crate::WINDOW_SIZE, 8),
-                                height: round_up_div(crate::WINDOW_SIZE, 8),
+                                width: CONE_DEPTH_SIZE,
+                                height: CONE_DEPTH_SIZE,
                                 depth: 1,
                             },
                         ..trace_texture_descriptor_base
@@ -164,7 +164,9 @@ impl RenderTextures {
     }
 }
 
-fn round_up_div(val: u32, divisor: u32) 
+pub const CONE_DEPTH_SIZE: u32 = round_up_div(crate::WINDOW_SIZE, 8);
+
+const fn round_up_div(val: u32, divisor: u32) 
 -> u32 {
     (val + divisor - 1) / divisor
 }

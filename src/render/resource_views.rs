@@ -1,6 +1,7 @@
 pub struct ResourceViews<'a> {
     pub color: wgpu::TextureView,
     pub depth: wgpu::TextureView,
+    pub cone_depth: wgpu::TextureView,
     pub trace_frame: wgpu::BufferSlice<'a>,
 
     pub map: wgpu::TextureView,
@@ -19,6 +20,9 @@ impl<'a> ResourceViews<'a> {
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             depth:
                 resources.render_textures.depth
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+            cone_depth:
+                resources.render_textures.cone_depth
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             map:
                 resources.map_texture

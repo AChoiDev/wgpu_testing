@@ -5,6 +5,7 @@ pub struct BindGroups {
     pub view: wgpu::BindGroup,
     pub edit_mono_bit_map_texture: wgpu::BindGroup,
     pub march: wgpu::BindGroup,
+    pub cone_march: wgpu::BindGroup,
     pub depth_shade: wgpu::BindGroup,
     pub process: wgpu::BindGroup,
     pub halve_map_binds: Vec<wgpu::BindGroup>,
@@ -24,6 +25,14 @@ impl BindGroups {
                         label: None,
                         layout: &bind_group_layouts.march,
                         entries: &march_entries(&views)
+                    }
+                ),
+            cone_march:
+                device.create_bind_group(
+                    &wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &bind_group_layouts.cone_march,
+                        entries: &cone_march_entries(&views)
                     }
                 ),
             process:
@@ -75,13 +84,6 @@ impl BindGroups {
                     }
                 ),
             halve_map_binds:
-                // device.create_bind_group(
-                //     &wgpu::BindGroupDescriptor {
-                //         label: None,
-                //         layout: &bind_group_layouts.halve_map,
-                //         entries: &halve_map_entries(&views, 1)
-                //     }
-                // ),
                 (1..(super::resources::MONO_BIT_LEVELS))
                 .into_iter()
                 .map(|i|
@@ -168,6 +170,22 @@ pub fn halve_map_entries<'a>(views: &'a super::resource_views::ResourceViews, ta
     )
 }
 
+pub fn cone_march_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(
+                &views.cone_depth,
+            ),
+            wgpu::BindingResource::TextureView(
+                &views.mono_bit_map,
+            ),
+            wgpu::BindingResource::Sampler(
+                &views.mono_bit_map_sampler,
+            ),
+        ]
+    )
+}
 
 pub fn march_entries<'a>(views: &'a super::resource_views::ResourceViews) 
 -> Vec<wgpu::BindGroupEntry<'a>> {
@@ -184,6 +202,9 @@ pub fn march_entries<'a>(views: &'a super::resource_views::ResourceViews)
             ),
             wgpu::BindingResource::Sampler(
                 &views.mono_bit_map_sampler,
+            ),
+            wgpu::BindingResource::TextureView(
+                &views.cone_depth,
             ),
         ]
     )

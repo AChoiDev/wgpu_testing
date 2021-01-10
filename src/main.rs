@@ -31,8 +31,6 @@ fn main() {
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;
-        let delta_time = frame_time.elapsed().as_secs_f32();
-        frame_time = std::time::Instant::now();
 
         match event {
             winit::event::Event::MainEventsCleared => {
@@ -40,6 +38,8 @@ fn main() {
             },
             winit::event::Event::RedrawRequested(_window_id) => {
 
+                let delta_time = frame_time.elapsed().as_secs_f32();
+                frame_time = std::time::Instant::now();
 
                 map_grid.set_all(
                     &(|coords| fill_voxel(coords, frame_count))

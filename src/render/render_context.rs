@@ -135,6 +135,13 @@ impl RenderContext {
 
         {
             let mut cpass = encoder.begin_compute_pass();
+            cpass.set_pipeline(&self.pipelines.cone_march);
+            cpass.set_bind_group(0, &self.bind_groups.cone_march, &[]);
+            cpass.set_bind_group(1, &self.bind_groups.view, &[]);
+            cpass.dispatch((super::resources::CONE_DEPTH_SIZE + 7) / 8, (super::resources::CONE_DEPTH_SIZE + 7) / 8, 1);
+        }
+        {
+            let mut cpass = encoder.begin_compute_pass();
 
             cpass.set_pipeline(&self.pipelines.march);
             cpass.set_bind_group(0, &self.bind_groups.map, &[]);

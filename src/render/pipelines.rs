@@ -3,6 +3,7 @@ use super::bind_group_layouts::BindGroupLayouts;
 pub struct Pipelines {
     pub process: wgpu::RenderPipeline,
     pub march: wgpu::ComputePipeline,
+    pub cone_march: wgpu::ComputePipeline,
     pub fill_sum_table: wgpu::ComputePipeline,
     pub depth_shade: wgpu::ComputePipeline,
     pub sum_table_passes: Vec<wgpu::ComputePipeline>,
@@ -15,7 +16,15 @@ impl Pipelines {
             sc_desc: &wgpu::SwapChainDescriptor)
     -> Self {
         Self {
-        
+            cone_march:
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/cone_march.comp.spv"),
+                    &device, 
+                    &[
+                        &bind_group_layouts.cone_march,
+                        &bind_group_layouts.view,
+                    ]
+                ),
             march:
                 make_compute_pipeline(
                     wgpu::include_spirv!("../spirv/primary_march.comp.spv"),

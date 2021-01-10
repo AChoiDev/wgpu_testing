@@ -1,5 +1,4 @@
 #version 460 core
-
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 //layout(set = 0, binding = 0, r8ui) uniform readonly uimage3D map;
 
@@ -22,15 +21,18 @@ layout(set = 2, binding = 0, r16ui) uniform readonly uimage3D sumMap;
 layout(set = 2, binding = 1, r32f) uniform image2D outputDepth;
 layout(set = 2, binding = 2) uniform utexture3D monoBitMap;
 layout(set = 2, binding = 3) uniform sampler monoBitMapSampler;
+layout(set = 2, binding = 4, r32f) uniform readonly image2D inputDepth;
 
-
-vec3 getRayDirection(vec3 lookAt, ivec2 pixelCoords) {
+vec2 getUV(ivec2 invoc) {
     vec2 resolution = imageSize(outputDepth);
     float ratio = resolution.x / resolution.y;
 
-    vec3 baseDir = normalize(
-      vec3((2.0 / resolution.y) * vec2(pixelCoords) - vec2(ratio, 1.0), cotanHalfFov)
-    );
+    vec2 pixelCoords =  vec2(invoc) + vec2(0.5);
+    return (2.0 / resolution.y) * pixelCoords - vec2(ratio, 1.0);
+}
+
+vec3 getRayDirection(ivec2 invoc) {
+    vec3 baseDir = normalize(vec3(getUV(invoc), cotanHalfFov));
 
     return baseDir.x * right + baseDir.y * up + baseDir.z * forward;
 }
@@ -50,6 +52,11 @@ uint extractMonoBitMap(ivec3 coords, int lod) {
   //get the nth bit
   return (texelValue >> bitIndex) & 1;
 }
+
+bool checkVoxel(ivec3 coords, int lod) {
+  return extractMonoBitMap(coords >> lod, lod) == 1;
+}
+
 float mincomp(vec3 value) {
     return min(min(value.x, value.z), value.y);
 }
@@ -59,13 +66,10 @@ bool insideBox3D(vec3 v, vec3 bottomLeft, vec3 topRight) {
     return (s.x * s.y * s.z) == 1.0; 
 }
 
-bool checkVoxel(ivec3 coords, int lod) {
-  return extractMonoBitMap(coords >> lod, lod) == 1;
-}
 
 vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
   hit = false;
-  float t = 0;
+  float t = imageLoad(inputDepth,  ivec2(gl_GlobalInvocationID.xy) / 8).r - 0.00001;
   int i = 0;
   
   vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
@@ -94,17 +98,20 @@ vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
 
 
 void main() {
-    ivec2 pixel_pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 invoc = ivec2(gl_GlobalInvocationID.xy);
+
+    // imageStore(outputDepth, invoc, vec4(imageLoad(inputDepth,  ivec2(gl_GlobalInvocationID.xy) / 8).r - 0.00001));
+    // return;
 
     bool hit;
-    vec3 endPos = PlaneMarch(pos, getRayDirection(vec3(0.0, 0.0, 1.0), pixel_pos), hit);
+    vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
     if (!hit) {
-      imageStore(outputDepth, pixel_pos, vec4(40.0));
+      imageStore(outputDepth, invoc, vec4(40.0));
       return;
     }
 
-    float rayLength = length(endPos - vec3(15));
+    float rayLength = length(endPos - pos);
 
-    imageStore(outputDepth, pixel_pos, vec4(rayLength));
+    imageStore(outputDepth, invoc, vec4(rayLength));
 }
 

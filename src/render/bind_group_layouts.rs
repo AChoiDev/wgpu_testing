@@ -6,6 +6,7 @@ pub struct BindGroupLayouts {
     pub edit_sum_table: wgpu::BindGroupLayout,
     pub view: wgpu::BindGroupLayout,
     pub march: wgpu::BindGroupLayout,
+    pub cone_march: wgpu::BindGroupLayout,
     pub depth_shade: wgpu::BindGroupLayout,
     pub process: wgpu::BindGroupLayout,
     pub halve_map: wgpu::BindGroupLayout,
@@ -19,12 +20,34 @@ impl BindGroupLayouts {
             edit_sum_table: edit_sum_table_layout(&device),
             view: view_layout(&device),
             march: march_layout(&device),
+            cone_march: cone_march_layout(&device),
             depth_shade: depth_shade_layout(&device),
             process: process_layout(&device),
             edit_map: edit_map_layout(&device),
             halve_map: halve_map_layout(&device),
         }
     }
+}
+
+fn cone_march_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device, 
+        &[
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D2,
+                format: wgpu::TextureFormat::R32Float,
+                readonly: false,
+            },
+            wgpu::BindingType::SampledTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                component_type: wgpu::TextureComponentType::Uint,
+                multisampled: false,
+            },
+            wgpu::BindingType::Sampler {
+                comparison: false,
+            },
+        ]
+        )
 }
 
 fn edit_map_layout(device: &wgpu::Device) 
@@ -132,6 +155,11 @@ fn march_layout(device: &wgpu::Device)
             },
             wgpu::BindingType::Sampler {
                 comparison: false,
+            },
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D2,
+                format: wgpu::TextureFormat::R32Float,
+                readonly: true,
             },
         ]
     )
