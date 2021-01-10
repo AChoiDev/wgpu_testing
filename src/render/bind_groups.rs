@@ -1,23 +1,29 @@
+
 pub struct BindGroups {
-    pub trace: wgpu::BindGroup,
-    pub process: wgpu::BindGroup,
+    pub map: wgpu::BindGroup,
     pub edit_sum_table: wgpu::BindGroup,
+    pub view: wgpu::BindGroup,
+    pub edit_mono_bit_map_texture: wgpu::BindGroup,
+    pub march: wgpu::BindGroup,
+    pub depth_shade: wgpu::BindGroup,
+    pub process: wgpu::BindGroup,
+    pub halve_map_binds: Vec<wgpu::BindGroup>,
 }
 
 impl BindGroups {
     pub fn new(
         device: &wgpu::Device, 
         bind_group_layouts: &super::bind_group_layouts::BindGroupLayouts,
-        views: &super::resources::ResourceViews,
+        views: &super::resource_views::ResourceViews,
     ) 
     -> Self {
         Self {
-            trace:
+            march:
                 device.create_bind_group(
                     &wgpu::BindGroupDescriptor {
                         label: None,
                         layout: &bind_group_layouts.march,
-                        entries: &make_trace_entries(&views)
+                        entries: &march_entries(&views)
                     }
                 ),
             process:
@@ -28,6 +34,14 @@ impl BindGroups {
                         entries: &make_process_entries(&views),
                     }
                 ),
+            view: 
+                device.create_bind_group(
+                    &wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &bind_group_layouts.view,
+                        entries: &view_entries(&views),
+                    }
+                ),
             edit_sum_table:
                 device.create_bind_group(
                     &wgpu::BindGroupDescriptor {
@@ -36,51 +50,150 @@ impl BindGroups {
                         entries: &make_edit_sum_table_entries(&views)
                     }
                 ),
+            map:
+                device.create_bind_group(
+                    &wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &bind_group_layouts.map,
+                        entries: &map_entries(&views)
+                    }
+                ),
+            edit_mono_bit_map_texture:
+                device.create_bind_group(
+                    &wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &bind_group_layouts.edit_map,
+                        entries: &edit_mono_bit_map_entries(&views)
+                    }
+                ),
+            depth_shade:
+                device.create_bind_group(
+                    &wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &bind_group_layouts.depth_shade,
+                        entries: &depth_shade_entries(&views)
+                    }
+                ),
+            halve_map_binds:
+                // device.create_bind_group(
+                //     &wgpu::BindGroupDescriptor {
+                //         label: None,
+                //         layout: &bind_group_layouts.halve_map,
+                //         entries: &halve_map_entries(&views, 1)
+                //     }
+                // ),
+                (1..(super::resources::MONO_BIT_LEVELS))
+                .into_iter()
+                .map(|i|
+                    device.create_bind_group(
+                        &wgpu::BindGroupDescriptor {
+                            label: None,
+                            layout: &bind_group_layouts.halve_map,
+                            entries: &halve_map_entries(&views, i as usize),
+                        }
+                    )
+                ).collect()
         }
     }
 }
-pub fn make_edit_sum_table_entries<'a>(views: &'a super::resources::ResourceViews) 
+
+fn edit_mono_bit_map_entries<'a>(views: &'a super::resource_views::ResourceViews) 
 -> Vec<wgpu::BindGroupEntry<'a>> {
     make_entries(
         vec![
             wgpu::BindingResource::TextureView(
-                &views.map
-            ),
-            wgpu::BindingResource::TextureView(
-                &views.sum_map,
-            ),
-        ]
-    )
-}
-
-
-pub fn make_trace_entries<'a>(views: &'a super::resources::ResourceViews) 
--> Vec<wgpu::BindGroupEntry<'a>> {
-    make_entries(
-        vec![
-            wgpu::BindingResource::TextureView(
-                &views.color
-            ),
-            wgpu::BindingResource::TextureView(
-                &views.map
-            ),
-            wgpu::BindingResource::TextureView(
-                &views.sum_map,
-            ),
-            wgpu::BindingResource::Buffer(
-                views.trace_frame
-            ),
-        ]
-    )
-}
-
-pub fn make_process_entries<'a>(views: &'a super::resources::ResourceViews) 
--> Vec<wgpu::BindGroupEntry<'a>> {
-    make_entries(
-        vec![
-            wgpu::BindingResource::TextureView(
-                &views.color
+                &views.mono_bit_map,
             )
+        ]
+    )
+}
+
+fn depth_shade_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(
+                &views.depth,
+            ),
+            wgpu::BindingResource::TextureView(
+                &views.color,
+            ),
+        ]
+    )
+}
+
+fn view_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::Buffer(
+                views.trace_frame,
+            ),
+        ]
+    )
+}
+fn map_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(
+                &views.map,
+            ),
+        ]
+    )
+}
+
+pub fn make_edit_sum_table_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(
+                &views.sum_map,
+            ),
+        ]
+    )
+}
+
+pub fn halve_map_entries<'a>(views: &'a super::resource_views::ResourceViews, target_level: usize) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(
+                &views.mono_bit_map_mipmaps[target_level - 1],
+            ),
+            wgpu::BindingResource::TextureView(
+                &views.mono_bit_map_mipmaps[target_level],
+            )
+        ]
+    )
+}
+
+
+pub fn march_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(
+                &views.sum_map,
+            ),
+            wgpu::BindingResource::TextureView(
+                &views.depth,
+            ),
+            wgpu::BindingResource::TextureView(
+                &views.mono_bit_map,
+            ),
+            wgpu::BindingResource::Sampler(
+                &views.mono_bit_map_sampler,
+            ),
+        ]
+    )
+}
+
+pub fn make_process_entries<'a>(views: &'a super::resource_views::ResourceViews) 
+-> Vec<wgpu::BindGroupEntry<'a>> {
+    make_entries(
+        vec![
+            wgpu::BindingResource::TextureView(&views.color)
         ]
     )
 }

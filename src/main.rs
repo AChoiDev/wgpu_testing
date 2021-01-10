@@ -1,7 +1,6 @@
 use render::render_context::RenderDescriptor;
 
 pub const WINDOW_SIZE: u32 = 1024;
-
 mod byte_grid;
 mod render;
 
@@ -28,9 +27,12 @@ fn main() {
     let mut frame_time = std::time::Instant::now();
 
     let mut orientation = na::UnitQuaternion::<f32>::identity();
+    let mut pos = na::Vector3::repeat(15f32);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;
+        let delta_time = frame_time.elapsed().as_secs_f32();
+        frame_time = std::time::Instant::now();
 
         match event {
             winit::event::Event::MainEventsCleared => {
@@ -38,8 +40,6 @@ fn main() {
             },
             winit::event::Event::RedrawRequested(_window_id) => {
 
-                let delta_time = frame_time.elapsed().as_secs_f32();
-                frame_time = std::time::Instant::now();
 
                 map_grid.set_all(
                     &(|coords| fill_voxel(coords, frame_count))
@@ -50,6 +50,7 @@ fn main() {
                         window: &window,
                         map_data: &map_grid,
                         cam_orientation: orientation,
+                        pos,
                         delta_time
                     }
                 );
@@ -63,6 +64,12 @@ fn main() {
         if input.update(&event) {
             if input.key_pressed(winit::event::VirtualKeyCode::Escape) {
                 *control_flow = winit::event_loop::ControlFlow::Exit;
+            }
+            if input.key_held(winit::event::VirtualKeyCode::Period) {
+                pos += 0.1f32 * orientation.transform_vector(&na::Vector3::z());
+            }
+            if input.key_held(winit::event::VirtualKeyCode::E) {
+                pos -= 0.1f32 * orientation.transform_vector(&na::Vector3::z());
             }
 
             let mouse_diff = input.mouse_diff();
@@ -80,7 +87,7 @@ fn fill_voxel(coords: [usize ; 3], frame: u32)
     let disp = [15 - coords[0] as i32, 15 - coords[1] as i32, 15 - coords[2] as i32];
     let mag_sqr = disp[0] * disp[0] + disp[1] * disp[1] + disp[2] * disp[2];
 
-    if mag_sqr < 18i32.pow(2) && ((frame / 20) % 2 == 0 || 31 - coords[1] > 6) {
+    if mag_sqr < 20i32.pow(2) && ((frame / 20) % 2 == 0 || coords[1] < 25) {
         255 // not filled
     } 
     else {

@@ -2,27 +2,33 @@ use super::bind_group_layouts::BindGroupLayouts;
 
 pub struct Pipelines {
     pub process: wgpu::RenderPipeline,
-    pub trace: wgpu::ComputePipeline,
+    pub march: wgpu::ComputePipeline,
     pub fill_sum_table: wgpu::ComputePipeline,
+    pub depth_shade: wgpu::ComputePipeline,
     pub sum_table_passes: Vec<wgpu::ComputePipeline>,
+    pub fill_bit_volume: wgpu::ComputePipeline,
+    pub halve_bit_volume: wgpu::ComputePipeline,
 }
 
 impl Pipelines {
     pub fn new(device: &wgpu::Device, bind_group_layouts : &BindGroupLayouts, 
             sc_desc: &wgpu::SwapChainDescriptor)
     -> Self {
-
         Self {
-            trace:
+        
+            march:
                 make_compute_pipeline(
-                    wgpu::include_spirv!("../spirv/gradient.comp.spv"),
+                    wgpu::include_spirv!("../spirv/primary_march.comp.spv"),
                     &device,
                     &[
+                        &bind_group_layouts.map,
+                        &bind_group_layouts.view,
                         &bind_group_layouts.march,
                     ]
                 ),
             process:
-                make_process_pipeline(&device, &sc_desc, 
+                make_process_pipeline(&device, 
+                    &sc_desc, 
                     &[
                         &bind_group_layouts.process
                     ]
@@ -32,10 +38,39 @@ impl Pipelines {
                     wgpu::include_spirv!("../spirv/fill_sum_table.comp.spv"),
                     &device,
                     &[
+                        &bind_group_layouts.map,
                         &bind_group_layouts.edit_sum_table,
                     ]
                 ),
-            sum_table_passes: make_sum_table_passes(&device, &bind_group_layouts)
+            depth_shade: 
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/depth_shade.comp.spv"), 
+                    &device, 
+                    &[
+                        &bind_group_layouts.map,
+                        &bind_group_layouts.view,
+                        &bind_group_layouts.depth_shade,
+                    ]
+                ),
+            sum_table_passes: make_sum_table_passes(&device, &bind_group_layouts),
+            fill_bit_volume:
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/fill_bit_volume.comp.spv"),
+                    &device,
+                    &[
+                        &bind_group_layouts.map,
+                        &bind_group_layouts.edit_map,
+                    ]
+                ),
+            halve_bit_volume:
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/halve_bit_volume.comp.spv"),
+                    &device, 
+                    &[
+                        &bind_group_layouts.halve_map,
+                    ]
+                ),
+            
         }
     }
 }
@@ -53,6 +88,7 @@ fn make_sum_table_passes(device: &wgpu::Device, bind_group_layouts: &BindGroupLa
             source,
             &device,
             &[
+                &bind_group_layouts.map,
                 &bind_group_layouts.edit_sum_table,
             ]
         ),

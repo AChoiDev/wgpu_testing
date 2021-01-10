@@ -68,7 +68,7 @@ impl RenderContext {
     let pipelines = 
         super::pipelines::Pipelines::new(&device, &bind_group_layouts, &swapchain_descriptor);
 
-    let views = super::resources::ResourceViews::new(&resources);
+    let views = super::resource_views::ResourceViews::new(&resources);
 
     let bind_groups = 
         super::bind_groups::BindGroups::new(
@@ -106,7 +106,6 @@ impl RenderContext {
                 }
             );
 
-
         self.queue.write_texture(
             self.resources.map_texture_copy_view(),
             render_desc.map_data.full_slice(),
@@ -122,39 +121,34 @@ impl RenderContext {
             }
         );
 
-
+        // upload once-per-frame view buffers
         {
             let data = super::shader_data::trace_frame::make_bytes(
-                render_desc.cam_orientation, 100f32);
+                render_desc.pos,
+                render_desc.cam_orientation, 100f32, );
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
-        // fill the sum table with 1s corresponding to the map texture
-        {
-            let mut cpass = encoder.begin_compute_pass();
-            
-            cpass.set_pipeline(&self.pipelines.fill_sum_table);
-            cpass.set_bind_group(0, &self.bind_groups.edit_sum_table, &[]);
-            cpass.dispatch(8, 8, 8);
-        }
+        self.construct_bit_volume(&mut encoder);
 
-        // sum table computations
-        {
-            self.pipelines.sum_table_passes
-            .iter()
-            .for_each(|pipeline| {
-                let mut cpass = encoder.begin_compute_pass();
-                cpass.set_pipeline(pipeline);
-                cpass.set_bind_group(0, &self.bind_groups.edit_sum_table, &[]);
-                cpass.dispatch(4, 4, 1);
-            });
-        }
+        self.construct_sum_volume(&mut encoder);
 
         {
             let mut cpass = encoder.begin_compute_pass();
 
-            cpass.set_pipeline(&self.pipelines.trace);
-            cpass.set_bind_group(0, &self.bind_groups.trace, &[]);
+            cpass.set_pipeline(&self.pipelines.march);
+            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
+            cpass.set_bind_group(1, &self.bind_groups.view, &[]);
+            cpass.set_bind_group(2, &self.bind_groups.march, &[]);
+            cpass.dispatch((crate::WINDOW_SIZE + 7) / 8, (crate::WINDOW_SIZE + 7) / 8, 1);
+        }
+
+        {
+            let mut cpass = encoder.begin_compute_pass();
+            cpass.set_pipeline(&self.pipelines.depth_shade);
+            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
+            cpass.set_bind_group(1, &self.bind_groups.view, &[]);
+            cpass.set_bind_group(2, &self.bind_groups.depth_shade, &[]);
             cpass.dispatch((crate::WINDOW_SIZE + 7) / 8, (crate::WINDOW_SIZE + 7) / 8, 1);
         }
 
@@ -168,9 +162,55 @@ impl RenderContext {
             };
 
         self.copy_to_swapchain_by_screen_quad(&sc_rpass_desc, &mut encoder);
+
         self.imgui_render(&sc_rpass_desc, render_desc.window, render_desc.delta_time, render_desc.cam_orientation, &mut encoder);
 
         self.queue.submit(Some(encoder.finish()));
+    }
+
+    pub fn construct_sum_volume(&self, encoder: &mut wgpu::CommandEncoder) {
+        // Fill sum table with initial ones from map
+        {
+            let mut cpass = encoder.begin_compute_pass();
+            
+            cpass.set_pipeline(&self.pipelines.fill_sum_table);
+            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
+            cpass.set_bind_group(1, &self.bind_groups.edit_sum_table, &[]);
+            cpass.dispatch(8, 8, 8);
+        }
+
+        self.pipelines.sum_table_passes
+        .iter()
+        .for_each(|pipeline| {
+            let mut cpass = encoder.begin_compute_pass();
+            cpass.set_pipeline(pipeline);
+            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
+            cpass.set_bind_group(1, &self.bind_groups.edit_sum_table, &[]);
+            cpass.dispatch(4, 4, 1);
+        });
+    }
+
+    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder) {
+        // Fill bit volume from initial uploaded map
+        {
+            let mut cpass = encoder.begin_compute_pass();
+
+            cpass.set_pipeline(&self.pipelines.fill_bit_volume);
+            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
+            cpass.set_bind_group(1, &self.bind_groups.edit_mono_bit_map_texture, &[]);
+            cpass.dispatch(4, 4, 4);
+        }
+
+        [2, 1, 0]
+        .iter()
+        .map(|&i| 2u32.pow(i))
+        .enumerate()
+        .for_each(|(i, d)| {
+            let mut cpass = encoder.begin_compute_pass();
+            cpass.set_pipeline(&self.pipelines.halve_bit_volume);
+            cpass.set_bind_group(0, &self.bind_groups.halve_map_binds[i], &[]);
+            cpass.dispatch(d, d, d);
+        });
     }
 
     pub fn copy_to_swapchain_by_screen_quad(&self, 
@@ -219,5 +259,6 @@ pub struct RenderDescriptor<'a> {
     pub window: &'a winit::window::Window,
     pub map_data: &'a ByteGrid,
     pub cam_orientation: na::UnitQuaternion<f32>,
+    pub pos: na::Vector3<f32>,
     pub delta_time: f32,
 }

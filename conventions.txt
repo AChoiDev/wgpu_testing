@@ -1,0 +1,2 @@
+255 is the null index, it represents empty space
+indices 0-254 are dynamically bounded to their values

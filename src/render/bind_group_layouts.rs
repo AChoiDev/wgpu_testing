@@ -1,45 +1,49 @@
 
+
 pub struct BindGroupLayouts {
-    pub process: wgpu::BindGroupLayout,
-    pub march: wgpu::BindGroupLayout,
+    pub map: wgpu::BindGroupLayout,
+    pub edit_map: wgpu::BindGroupLayout,
     pub edit_sum_table: wgpu::BindGroupLayout,
+    pub view: wgpu::BindGroupLayout,
+    pub march: wgpu::BindGroupLayout,
+    pub depth_shade: wgpu::BindGroupLayout,
+    pub process: wgpu::BindGroupLayout,
+    pub halve_map: wgpu::BindGroupLayout,
 }
 
 impl BindGroupLayouts {
     pub fn new(device: &wgpu::Device)
     -> Self {
         Self {
-            march:
-                device.create_bind_group_layout(
-                    &wgpu::BindGroupLayoutDescriptor {
-                        label: None,
-                        entries: &make_trace_compute_entries(),
-                    } 
-                ),
-            process:
-                device.create_bind_group_layout(
-                    &wgpu::BindGroupLayoutDescriptor {
-                        label: None,
-                        entries: &make_process_compute_entries(),
-                            
-                    }
-               ),
-            edit_sum_table:
-                device.create_bind_group_layout(
-                    &wgpu::BindGroupLayoutDescriptor {
-                        label: None,
-                        entries: &make_process_sum_entries(),
-                    }
-               ),
-               
+            map: map_layout(&device),
+            edit_sum_table: edit_sum_table_layout(&device),
+            view: view_layout(&device),
+            march: march_layout(&device),
+            depth_shade: depth_shade_layout(&device),
+            process: process_layout(&device),
+            edit_map: edit_map_layout(&device),
+            halve_map: halve_map_layout(&device),
         }
     }
 }
 
-fn make_process_sum_entries()
--> Vec<wgpu::BindGroupLayoutEntry> {
-    make_compute_entries(
-        vec![
+fn edit_map_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device, 
+        &[
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R8Uint,
+                readonly: false,
+            }
+        ]
+    )
+}
+
+fn halve_map_layout(device: &wgpu::Device)
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device, 
+        &[
             wgpu::BindingType::StorageTexture {
                 dimension: wgpu::TextureViewDimension::D3,
                 format: wgpu::TextureFormat::R8Uint,
@@ -47,14 +51,107 @@ fn make_process_sum_entries()
             },
             wgpu::BindingType::StorageTexture {
                 dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R8Uint,
+                readonly: false,
+            }
+        ]
+    )
+}
+
+fn edit_sum_table_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device,
+        &[
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
                 format: wgpu::TextureFormat::R16Uint,
+                readonly: false,
+            }
+        ]
+    )
+}
+
+fn view_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device, 
+        &[
+            wgpu::BindingType::UniformBuffer {
+                dynamic: false,
+                min_binding_size: None,
+            }
+        ]
+    )
+}
+
+fn process_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(
+        & wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &process_entries(),
+        }
+    )
+}
+
+fn depth_shade_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device, 
+        &[
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D2,
+                format: wgpu::TextureFormat::R32Float,
+                readonly: true,
+            },
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D2,
+                format: wgpu::TextureFormat::Rg11b10Float,
                 readonly: false,
             },
         ]
     )
 }
 
-fn make_process_compute_entries()
+fn march_layout(device: &wgpu::Device)
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device, 
+        &[
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R16Uint,
+                readonly: true,
+            },
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D2,
+                format: wgpu::TextureFormat::R32Float,
+                readonly: false,
+            },
+            wgpu::BindingType::SampledTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                component_type: wgpu::TextureComponentType::Uint,
+                multisampled: false,
+            },
+            wgpu::BindingType::Sampler {
+                comparison: false,
+            },
+        ]
+    )
+}
+
+fn map_layout(device: &wgpu::Device) 
+-> wgpu::BindGroupLayout {
+    bind_group_layout_compute(&device,
+        &[
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R16Uint,
+                readonly: true,
+            }
+        ]
+    )
+}
+
+
+fn process_entries()
 -> Vec<wgpu::BindGroupLayoutEntry> {
     vec![
         wgpu::BindGroupLayoutEntry {
@@ -71,36 +168,21 @@ fn make_process_compute_entries()
     ]
 }
 
-fn make_trace_compute_entries() 
--> Vec<wgpu::BindGroupLayoutEntry> {
-    make_compute_entries(
-        vec![
-            wgpu::BindingType::StorageTexture {
-                dimension: wgpu::TextureViewDimension::D2,
-                format: wgpu::TextureFormat::Rg11b10Float,
-                readonly: false,
-            },
-            wgpu::BindingType::StorageTexture {
-                dimension: wgpu::TextureViewDimension::D3,
-                format: wgpu::TextureFormat::R8Uint,
-                readonly: true,
-            },
-            wgpu::BindingType::StorageTexture {
-                dimension: wgpu::TextureViewDimension::D3,
-                format: wgpu::TextureFormat::R16Uint,
-                readonly: true,
-            },
-            wgpu::BindingType::UniformBuffer {
-                dynamic: false,
-                min_binding_size: None,
-            },
-        ]
+fn bind_group_layout_compute(device: &wgpu::Device, binding_types: &[wgpu::BindingType]) 
+-> wgpu::BindGroupLayout {
+
+    device.create_bind_group_layout(
+        &wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &make_compute_entries(binding_types)
+        }
     )
 }
 
-fn make_compute_entries(binding_types: Vec<wgpu::BindingType>) 
+fn make_compute_entries(binding_types: &[wgpu::BindingType]) 
 -> Vec<wgpu::BindGroupLayoutEntry> {
     binding_types
+    .to_vec()
     .into_iter()
     .enumerate()
     .map(|(i, bt)| 

@@ -1,37 +1,14 @@
 use wgpu::util::DeviceExt;
 
-pub struct ResourceViews<'a> {
-    pub color: wgpu::TextureView,
-    pub map: wgpu::TextureView,
-    pub trace_frame: wgpu::BufferSlice<'a>,
-    pub sum_map: wgpu::TextureView,
-}
-
-impl<'a> ResourceViews<'a> {
-    pub fn new(resources: &'a Resources)
-    -> Self {
-        Self {
-            color:
-                resources.render_textures.color
-                .create_view(&wgpu::TextureViewDescriptor::default()),
-            map:
-                resources.map_texture
-                .create_view(&wgpu::TextureViewDescriptor::default()),
-            trace_frame:
-                resources.buffers.trace_frame
-                .slice(..),
-            sum_map:
-                resources.sum_texture
-                .create_view(&wgpu::TextureViewDescriptor::default()),
-        }
-    }
-}
+pub const MONO_BIT_LEVELS: u32 = 4;
 
 pub struct Resources {
     pub render_textures: RenderTextures,
     pub map_texture: wgpu::Texture,
     pub sum_texture: wgpu::Texture,
+    pub mono_bit_map_texture: wgpu::Texture,
     pub buffers: Buffers,
+    pub mono_bit_map_sampler: wgpu::Sampler,
 }
 
 impl Resources {
@@ -89,12 +66,39 @@ impl Resources {
                 }
             );
 
+        let mono_bit_map_texture =
+            device.create_texture(
+                &wgpu::TextureDescriptor {
+                    label: None,
+                    size: 
+                        wgpu::Extent3d {
+                            width: 16,
+                            height: 16,
+                            depth: 16,
+                        },
+                    mip_level_count: MONO_BIT_LEVELS,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D3,
+                    format: wgpu::TextureFormat::R8Uint,
+                    usage:
+                        wgpu::TextureUsage::SAMPLED |
+                        wgpu::TextureUsage::STORAGE,
+                }
+            );
+
+        
+        let mono_bit_map_sampler =
+            device.create_sampler(
+                &wgpu::SamplerDescriptor::default()
+            );
    
         Self {
             render_textures,
             buffers,
             map_texture,
             sum_texture,
+            mono_bit_map_texture,
+            mono_bit_map_sampler,
         }
 
     }
@@ -102,9 +106,9 @@ impl Resources {
 
 #[allow(dead_code)]
 pub struct RenderTextures {
-    color: wgpu::Texture,
-    depth: wgpu::Texture,
-    cone_depth: wgpu::Texture,
+    pub color: wgpu::Texture,
+    pub depth: wgpu::Texture,
+    pub cone_depth: wgpu::Texture,
 }
 
 impl RenderTextures {
@@ -190,7 +194,7 @@ impl Buffers {
             device.create_buffer(
                 &wgpu::BufferDescriptor {
                     label: None,
-                    size: 64,
+                    size: 80,
                     mapped_at_creation: false,
                     usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
                 },

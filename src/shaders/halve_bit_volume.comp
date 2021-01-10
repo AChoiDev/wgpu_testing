@@ -1,0 +1,35 @@
+#version 460 core
+layout (local_size_x = 2, local_size_y = 2, local_size_z = 2) in;
+
+layout(set = 0, binding = 0, r8ui) uniform readonly uimage3D monoBitMapSource;
+layout(set = 0, binding = 1, r8ui) uniform uimage3D monoBitMapOutput;
+
+ivec3 posFromIndex(int index) {
+    ivec3 positions[8] = ivec3[](
+        ivec3(0, 0, 0),
+        ivec3(1, 0, 0),
+        ivec3(0, 1, 0),
+        ivec3(1, 1, 0),
+        ivec3(0, 0, 1),
+        ivec3(1, 0, 1),
+        ivec3(0, 1, 1),
+        ivec3(1, 1, 1)
+    );
+
+    return positions[index];
+}
+
+void main() {
+    ivec3 invoc = ivec3(gl_GlobalInvocationID.xyz);
+
+    uint value = 0;
+
+    for (int i = 0; i < 8; i++) {
+        ivec3 sourceCoords = invoc * 2 + posFromIndex(i);
+        if (imageLoad(monoBitMapSource, sourceCoords).r != 0) {
+            value = value | (1 << i);
+        }
+    }
+
+    imageStore(monoBitMapOutput, invoc, uvec4(value));
+}
