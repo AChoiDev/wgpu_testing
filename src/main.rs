@@ -1,8 +1,13 @@
+use displaced_chunks::DisplacedChunks;
 use render::render_context::RenderDescriptor;
 
-pub const WINDOW_SIZE: u32 = 1024;
+pub const WINDOW_X: u32 = 1920;
+pub const WINDOW_Y: u32 = 1080;
+pub const RENDER_RES_X: u32 = 480;
+pub const RENDER_RES_Y: u32 = 270;
 mod byte_grid;
 mod render;
+mod displaced_chunks;
 
 use nalgebra as na;
 
@@ -12,16 +17,17 @@ fn main() {
     let window =
         winit::window::WindowBuilder::new()
         .with_title("Voxel Testing")
-        .with_inner_size(winit::dpi::PhysicalSize::new(WINDOW_SIZE, WINDOW_SIZE))
+        .with_inner_size(winit::dpi::PhysicalSize::new(WINDOW_X, WINDOW_Y))
         .build(&event_loop)
         .unwrap();
-        
 
     let mut render_context = render::render_context::RenderContext::new(&window);
 
     let mut input = winit_input_helper::WinitInputHelper::new();
 
     let mut map_grid = byte_grid::ByteGrid::new(32);
+
+    let mut displaced_chunks = DisplacedChunks::<byte_grid::ByteGrid>::new(displaced_chunks::radius_displacement_set(6));
 
     let mut frame_count = 0u32;
     let mut frame_time = std::time::Instant::now();
@@ -81,7 +87,7 @@ fn main() {
     });
 }
 
-fn fill_voxel(coords: [usize ; 3], frame: u32) 
+pub fn fill_voxel(coords: [usize ; 3], frame: u32) 
 -> u8 
 {
     let disp = [15 - coords[0] as i32, 15 - coords[1] as i32, 15 - coords[2] as i32];

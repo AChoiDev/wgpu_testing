@@ -7,7 +7,7 @@ pub struct ResourceViews<'a> {
     pub map: wgpu::TextureView,
     pub sum_map: wgpu::TextureView,
     pub mono_bit_map: wgpu::TextureView,
-    pub mono_bit_map_sampler: &'a wgpu::Sampler,
+    pub default_sampler: &'a wgpu::Sampler,
     pub mono_bit_map_mipmaps: Vec<wgpu::TextureView>,
 }
 
@@ -36,8 +36,8 @@ impl<'a> ResourceViews<'a> {
             mono_bit_map:
                 resources.mono_bit_map_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
-            mono_bit_map_sampler:
-                &resources.mono_bit_map_sampler,
+            default_sampler:
+                &resources.default_sampler,
             mono_bit_map_mipmaps:
                 (0..4)
                 .into_iter()

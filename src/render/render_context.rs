@@ -133,12 +133,16 @@ impl RenderContext {
 
         self.construct_sum_volume(&mut encoder);
 
+        use super::resources::round_up_div;
+
+        let res_dispatch = [round_up_div(crate::RENDER_RES_X, 8), round_up_div(crate::RENDER_RES_Y, 8)];
+
         {
             let mut cpass = encoder.begin_compute_pass();
             cpass.set_pipeline(&self.pipelines.cone_march);
             cpass.set_bind_group(0, &self.bind_groups.cone_march, &[]);
             cpass.set_bind_group(1, &self.bind_groups.view, &[]);
-            cpass.dispatch((super::resources::CONE_DEPTH_SIZE + 7) / 8, (super::resources::CONE_DEPTH_SIZE + 7) / 8, 1);
+            cpass.dispatch((super::resources::CONE_DEPTH_RES_X + 7) / 8, (super::resources::CONE_DEPTH_RES_Y + 7) / 8, 1);
         }
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -147,7 +151,7 @@ impl RenderContext {
             cpass.set_bind_group(0, &self.bind_groups.map, &[]);
             cpass.set_bind_group(1, &self.bind_groups.view, &[]);
             cpass.set_bind_group(2, &self.bind_groups.march, &[]);
-            cpass.dispatch((crate::WINDOW_SIZE + 7) / 8, (crate::WINDOW_SIZE + 7) / 8, 1);
+            cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
 
         {
@@ -156,7 +160,7 @@ impl RenderContext {
             cpass.set_bind_group(0, &self.bind_groups.map, &[]);
             cpass.set_bind_group(1, &self.bind_groups.view, &[]);
             cpass.set_bind_group(2, &self.bind_groups.depth_shade, &[]);
-            cpass.dispatch((crate::WINDOW_SIZE + 7) / 8, (crate::WINDOW_SIZE + 7) / 8, 1);
+            cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
 
         let sc_rpass_desc =

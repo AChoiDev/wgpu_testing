@@ -43,31 +43,34 @@ uint extractMonoBitMap(ivec3 coords, int lod) {
 // Distance to nearest voxel
 float approximateDistance(vec3 pos) {
     
-    for (int m = 4 - 1; m >= 0; m--) {
-        vec3 scaledPos = pos * exp2(-m);
+    for (int m = 4 - 1; m >= -3; m--) {
 
-        vec3 disp = vec3(0.5);
+        int level = max(m, 0);
+        vec3 scaledPos = pos * exp2(-level);
+
+        vec3 disp = vec3(0.5 * exp2(min(0, m)));
         vec3 minPos = scaledPos - disp;
         vec3 maxPos = scaledPos + disp;
 
-        if (!boxInBox(minPos, maxPos, vec3(0.0), vec3(exp2(5 - m)))) {
+        if (!boxInBox(minPos, maxPos, vec3(0.0), vec3(exp2(5 - level)))) {
             break;
         }
 
         uint inBound = 
-              extractMonoBitMap(ivec3(minPos.x, minPos.y, minPos.z), m)
-            + extractMonoBitMap(ivec3(maxPos.x, minPos.y, minPos.z), m)
-            + extractMonoBitMap(ivec3(minPos.x, maxPos.y, minPos.z), m)
-            + extractMonoBitMap(ivec3(minPos.x, minPos.y, maxPos.z), m)
-            + extractMonoBitMap(ivec3(maxPos.x, maxPos.y, minPos.z), m)
-            + extractMonoBitMap(ivec3(minPos.x, maxPos.y, maxPos.z), m)
-            + extractMonoBitMap(ivec3(maxPos.x, minPos.y, maxPos.z), m)
-            + extractMonoBitMap(ivec3(maxPos.x, maxPos.y, maxPos.z), m);
+              extractMonoBitMap(ivec3(minPos.x, minPos.y, minPos.z), level)
+            + extractMonoBitMap(ivec3(maxPos.x, minPos.y, minPos.z), level)
+            + extractMonoBitMap(ivec3(minPos.x, maxPos.y, minPos.z), level)
+            + extractMonoBitMap(ivec3(minPos.x, minPos.y, maxPos.z), level)
+            + extractMonoBitMap(ivec3(maxPos.x, maxPos.y, minPos.z), level)
+            + extractMonoBitMap(ivec3(minPos.x, maxPos.y, maxPos.z), level)
+            + extractMonoBitMap(ivec3(maxPos.x, minPos.y, maxPos.z), level)
+            + extractMonoBitMap(ivec3(maxPos.x, maxPos.y, maxPos.z), level);
 
         if (inBound == 0) {
             return exp2(m - 1);
         }
     }
+
     return 0.0;
 }
 

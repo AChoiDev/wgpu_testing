@@ -8,7 +8,7 @@ pub struct Resources {
     pub sum_texture: wgpu::Texture,
     pub mono_bit_map_texture: wgpu::Texture,
     pub buffers: Buffers,
-    pub mono_bit_map_sampler: wgpu::Sampler,
+    pub default_sampler: wgpu::Sampler,
 }
 
 impl Resources {
@@ -87,7 +87,7 @@ impl Resources {
             );
 
         
-        let mono_bit_map_sampler =
+        let default_sampler =
             device.create_sampler(
                 &wgpu::SamplerDescriptor::default()
             );
@@ -98,7 +98,7 @@ impl Resources {
             map_texture,
             sum_texture,
             mono_bit_map_texture,
-            mono_bit_map_sampler,
+            default_sampler,
         }
 
     }
@@ -120,8 +120,8 @@ impl RenderTextures {
                 label: None,
                 size: 
                     wgpu::Extent3d {
-                        width: crate::WINDOW_SIZE,
-                        height: crate::WINDOW_SIZE,
+                        width: crate::RENDER_RES_X,
+                        height: crate::RENDER_RES_Y,
                         depth: 1,
                     },
                 mip_level_count: 1,
@@ -137,6 +137,7 @@ impl RenderTextures {
                 device.create_texture(
                     &wgpu::TextureDescriptor {
                         format: wgpu::TextureFormat::Rg11b10Float,
+                        usage: wgpu::TextureUsage::STORAGE | wgpu::TextureUsage::SAMPLED,
                         ..trace_texture_descriptor_base
                     }
                 ),
@@ -153,8 +154,8 @@ impl RenderTextures {
                         format: wgpu::TextureFormat::R32Float,
                         size: 
                             wgpu::Extent3d {
-                                width: CONE_DEPTH_SIZE,
-                                height: CONE_DEPTH_SIZE,
+                                width: CONE_DEPTH_RES_X,
+                                height: CONE_DEPTH_RES_Y,
                                 depth: 1,
                             },
                         ..trace_texture_descriptor_base
@@ -164,9 +165,10 @@ impl RenderTextures {
     }
 }
 
-pub const CONE_DEPTH_SIZE: u32 = round_up_div(crate::WINDOW_SIZE, 8);
+pub const CONE_DEPTH_RES_X: u32 = round_up_div(crate::RENDER_RES_X, 8);
+pub const CONE_DEPTH_RES_Y: u32 = round_up_div(crate::RENDER_RES_Y, 8);
 
-const fn round_up_div(val: u32, divisor: u32) 
+pub const fn round_up_div(val: u32, divisor: u32) 
 -> u32 {
     (val + divisor - 1) / divisor
 }

@@ -57,3 +57,17 @@ impl ByteGrid {
         &self.data
     }
 }
+
+use nalgebra as na;
+impl super::displaced_chunks::ChunkData for ByteGrid {
+    fn allocate() -> Self {
+        ByteGrid::new(32)
+    }
+
+
+    fn initialize(&mut self, world_chunk_coords: na::Vector3<i32>) {
+        self.set_all(
+            &(|coords| super::fill_voxel(coords, 0))
+        );
+    }
+}

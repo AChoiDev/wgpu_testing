@@ -181,7 +181,7 @@ pub fn cone_march_entries<'a>(views: &'a super::resource_views::ResourceViews)
                 &views.mono_bit_map,
             ),
             wgpu::BindingResource::Sampler(
-                &views.mono_bit_map_sampler,
+                &views.default_sampler,
             ),
         ]
     )
@@ -201,7 +201,7 @@ pub fn march_entries<'a>(views: &'a super::resource_views::ResourceViews)
                 &views.mono_bit_map,
             ),
             wgpu::BindingResource::Sampler(
-                &views.mono_bit_map_sampler,
+                &views.default_sampler,
             ),
             wgpu::BindingResource::TextureView(
                 &views.cone_depth,
@@ -214,7 +214,8 @@ pub fn make_process_entries<'a>(views: &'a super::resource_views::ResourceViews)
 -> Vec<wgpu::BindGroupEntry<'a>> {
     make_entries(
         vec![
-            wgpu::BindingResource::TextureView(&views.color)
+            wgpu::BindingResource::TextureView(&views.color),
+            wgpu::BindingResource::Sampler(&views.default_sampler)
         ]
     )
 }

@@ -186,10 +186,19 @@ fn process_entries()
             binding: 0,
             visibility: wgpu::ShaderStage::FRAGMENT,
             ty: 
-                wgpu::BindingType::StorageTexture {
+                wgpu::BindingType::SampledTexture {
                     dimension: wgpu::TextureViewDimension::D2,
-                    format: wgpu::TextureFormat::Rg11b10Float,
-                    readonly: true,
+                    component_type: wgpu::TextureComponentType::Float,
+                    multisampled: false,
+                },
+            count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+            binding: 1,
+            visibility: wgpu::ShaderStage::FRAGMENT,
+            ty: 
+                wgpu::BindingType::Sampler {
+                    comparison: false,
                 },
             count: None,
         }
