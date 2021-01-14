@@ -14,11 +14,13 @@ struct TraceFrameData {
         p3: i32,
     cotan_half_fov: f32,
         p4: [i32 ; 3],
+    resolution: [i32 ; 2],
+        p5: [i32 ; 2]
 }
 unsafe impl bytemuck::Zeroable for TraceFrameData {}
 unsafe impl bytemuck::Pod for TraceFrameData {}
 
-pub fn make_bytes(pos: na::Vector3<f32>, orientation: na::UnitQuaternion<f32>, fov: f32) 
+pub fn make_bytes(pos: na::Vector3<f32>, render_resolution : [u32 ; 2], orientation: na::UnitQuaternion<f32>, fov: f32) 
 -> Vec<u8> {
 
     let trace_frame_data = TraceFrameData {
@@ -31,6 +33,8 @@ pub fn make_bytes(pos: na::Vector3<f32>, orientation: na::UnitQuaternion<f32>, f
             orientation.transform_vector(&na::Vector3::z_axis()).into(),
         cotan_half_fov:
             1. / (fov.to_radians() * 0.5).tan(),
+        resolution:
+            [render_resolution[0] as i32, render_resolution[1] as i32],
         ..Default::default()
     };
 

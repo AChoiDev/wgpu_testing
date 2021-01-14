@@ -1,10 +1,9 @@
 #version 460 core
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-//layout(set = 0, binding = 0, r8ui) uniform readonly uimage3D map;
 
 //p1 => padding1
 //TODO: Rename this to frame
-layout(set = 1, binding = 0) uniform Frame {
+layout(set = 0, binding = 5) uniform Frame {
     vec3 pos;
       int p0;
     vec3 right;             
@@ -13,21 +12,22 @@ layout(set = 1, binding = 0) uniform Frame {
       int p2;
     vec3 forward;           
       int p3;
-    float cotanHalfFov;     
-      vec3 p4;
+    float cotanHalfFov;
+      int p5; int p6; int p7;
+    ivec2 renderResolution;
+      int p8; int p9;
 };
 
-layout(set = 2, binding = 0, r16ui) uniform uimage3D sumMap;
-layout(set = 2, binding = 1, r32f) uniform image2D outputDepth;
-layout(set = 2, binding = 2) uniform utexture3D monoBitMap;
-layout(set = 2, binding = 3) uniform sampler monoBitMapSampler;
-layout(set = 2, binding = 4, r32f) uniform image2D inputDepth;
+layout(set = 0, binding = 0, r32f) uniform image2D depth;
+layout(set = 0, binding = 2) uniform sampler monoBitMapSampler;
+layout(set = 0, binding = 3) uniform utexture3D monoBitMap;
 
 vec2 getUV(ivec2 invoc) {
-    vec2 resolution = imageSize(outputDepth);
+    vec2 resolution = vec2(renderResolution);
     float ratio = resolution.x / resolution.y;
 
     vec2 pixelCoords =  vec2(invoc) + vec2(0.5);
+    
     return (2.0 / resolution.y) * pixelCoords - vec2(ratio, 1.0);
 }
 
@@ -66,10 +66,23 @@ bool insideBox3D(vec3 v, vec3 bottomLeft, vec3 topRight) {
     return (s.x * s.y * s.z) == 1.0; 
 }
 
+float getInputDepth(ivec2 invoc) {
+  ivec2 coneCoords = invoc / 8;
+
+  ivec2 coneDepthDims = (renderResolution + ivec2(7)) / 8;
+
+  int pixelIndex = coneCoords.x + coneCoords.y * coneDepthDims.x;
+  
+  ivec2 readLocation = ivec2(pixelIndex % renderResolution.x, renderResolution.y + (pixelIndex / renderResolution.x));
+
+  
+  return imageLoad(depth, readLocation).r;
+}
+
 
 vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
   hit = false;
-  float t = imageLoad(inputDepth,  ivec2(gl_GlobalInvocationID.xy) / 8).r - 0.00001;
+  float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy)) - 0.00001;
   int i = 0;
   
   vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
@@ -99,18 +112,19 @@ vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
 void main() {
     ivec2 invoc = ivec2(gl_GlobalInvocationID.xy);
 
-    //imageStore(outputDepth, invoc, vec4(imageLoad(inputDepth,  ivec2(gl_GlobalInvocationID.xy) / 8).r - 0.00001));
-    //return;
+
+    // imageStore(depth, invoc, vec4(getInputDepth(invoc)));
+    // return;
 
     bool hit;
     vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
     if (!hit) {
-      imageStore(outputDepth, invoc, vec4(40.0));
+      imageStore(depth, invoc, vec4(40.0));
       return;
     }
 
     float rayLength = length(endPos - pos);
 
-    imageStore(outputDepth, invoc, vec4(rayLength));
+    imageStore(depth, invoc, vec4(rayLength));
 }
 

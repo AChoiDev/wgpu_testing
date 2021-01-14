@@ -4,9 +4,7 @@ pub struct Pipelines {
     pub process: wgpu::RenderPipeline,
     pub march: wgpu::ComputePipeline,
     pub cone_march: wgpu::ComputePipeline,
-    pub fill_sum_table: wgpu::ComputePipeline,
     pub depth_shade: wgpu::ComputePipeline,
-    pub sum_table_passes: Vec<wgpu::ComputePipeline>,
     pub fill_bit_volume: wgpu::ComputePipeline,
     pub halve_bit_volume: wgpu::ComputePipeline,
 }
@@ -18,90 +16,65 @@ impl Pipelines {
         Self {
             cone_march:
                 make_compute_pipeline(
-                    wgpu::include_spirv!("../spirv/cone_march.comp.spv"),
-                    &device, 
-                    &[
-                        &bind_group_layouts.cone_march,
-                        &bind_group_layouts.view,
-                    ]
+                    wgpu::include_spirv!("../spirv/cone_march.comp.spv"), 
+                    &device,
+                    &[&bind_group_layouts.primary_layout]
                 ),
             march:
                 make_compute_pipeline(
-                    wgpu::include_spirv!("../spirv/primary_march.comp.spv"),
+                    wgpu::include_spirv!("../spirv/primary_march.comp.spv"), 
                     &device,
-                    &[
-                        &bind_group_layouts.map,
-                        &bind_group_layouts.view,
-                        &bind_group_layouts.march,
-                    ]
+                    &[&bind_group_layouts.primary_layout]
                 ),
             process:
                 make_process_pipeline(&device, 
                     &sc_desc, 
-                    &[
-                        &bind_group_layouts.process
-                    ]
-                ),
-            fill_sum_table:
-                make_compute_pipeline(
-                    wgpu::include_spirv!("../spirv/fill_sum_table.comp.spv"),
-                    &device,
-                    &[
-                        &bind_group_layouts.map,
-                        &bind_group_layouts.edit_sum_table,
-                    ]
+                    &[&bind_group_layouts.process_layout]
                 ),
             depth_shade: 
-                make_compute_pipeline(
+                make_primary_pipeline(&device, &bind_group_layouts,
                     wgpu::include_spirv!("../spirv/depth_shade.comp.spv"), 
-                    &device, 
-                    &[
-                        &bind_group_layouts.map,
-                        &bind_group_layouts.view,
-                        &bind_group_layouts.depth_shade,
-                    ]
                 ),
-            sum_table_passes: make_sum_table_passes(&device, &bind_group_layouts),
             fill_bit_volume:
                 make_compute_pipeline(
                     wgpu::include_spirv!("../spirv/fill_bit_volume.comp.spv"),
                     &device,
-                    &[
-                        &bind_group_layouts.map,
-                        &bind_group_layouts.edit_map,
-                    ]
+                    &[&bind_group_layouts.primary_layout, &bind_group_layouts.edit_map]
                 ),
             halve_bit_volume:
                 make_compute_pipeline(
                     wgpu::include_spirv!("../spirv/halve_bit_volume.comp.spv"),
                     &device, 
-                    &[
-                        &bind_group_layouts.halve_map,
-                    ]
+                    &[&bind_group_layouts.halve_map]
                 ),
             
         }
     }
 }
 
-fn make_sum_table_passes(device: &wgpu::Device, bind_group_layouts: &BindGroupLayouts) 
--> Vec<wgpu::ComputePipeline> {
-    vec![
-        wgpu::include_spirv!("../spirv/sum_0.comp.spv"),
-        wgpu::include_spirv!("../spirv/sum_1.comp.spv"),
-        wgpu::include_spirv!("../spirv/sum_2.comp.spv"),
-    ]
-    .into_iter()
-    .map(|source|
-        make_compute_pipeline(
-            source,
-            &device,
-            &[
-                &bind_group_layouts.map,
-                &bind_group_layouts.edit_sum_table,
-            ]
-        ),
-    ).collect()
+// fn make_sum_table_passes(device: &wgpu::Device, bind_group_layouts: &BindGroupLayouts) 
+// -> Vec<wgpu::ComputePipeline> {
+//     vec![
+//         wgpu::include_spirv!("../spirv/sum_0.comp.spv"),
+//         wgpu::include_spirv!("../spirv/sum_1.comp.spv"),
+//         wgpu::include_spirv!("../spirv/sum_2.comp.spv"),
+//     ]
+//     .into_iter()
+//     .map(|source|
+//         make_compute_pipeline(
+//             source,
+//             &device,
+//             &[
+//                 &bind_group_layouts.map,
+//                 &bind_group_layouts.edit_sum_table,
+//             ]
+//         ),
+//     ).collect()
+// }
+
+fn make_primary_pipeline(device: &wgpu::Device, bind_group_layouts: &super::bind_group_layouts::BindGroupLayouts, source: wgpu::ShaderModuleSource) 
+-> wgpu::ComputePipeline {
+    make_compute_pipeline(source, device, &[&bind_group_layouts.primary_layout])
 }
 
 

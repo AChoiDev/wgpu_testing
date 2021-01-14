@@ -124,42 +124,31 @@ impl RenderContext {
         // upload once-per-frame view buffers
         {
             let data = super::shader_data::trace_frame::make_bytes(
-                render_desc.pos,
+                render_desc.pos, [crate::RENDER_RES_X, crate::RENDER_RES_Y],
                 render_desc.cam_orientation, 100f32, );
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
-        self.construct_bit_volume(&mut encoder);
 
-        self.construct_sum_volume(&mut encoder);
+        self.construct_bit_volume(&mut encoder, render_desc.frame);
 
-        use super::resources::round_up_div;
+        use super::resources::div_ceil;
 
-        let res_dispatch = [round_up_div(crate::RENDER_RES_X, 8), round_up_div(crate::RENDER_RES_Y, 8)];
+        let res_dispatch = [div_ceil(crate::RENDER_RES_X, 8), div_ceil(crate::RENDER_RES_Y, 8)];
 
-        {
-            let mut cpass = encoder.begin_compute_pass();
-            cpass.set_pipeline(&self.pipelines.cone_march);
-            cpass.set_bind_group(0, &self.bind_groups.cone_march, &[]);
-            cpass.set_bind_group(1, &self.bind_groups.view, &[]);
-            cpass.dispatch((super::resources::CONE_DEPTH_RES_X + 7) / 8, (super::resources::CONE_DEPTH_RES_Y + 7) / 8, 1);
-        }
+        self.cone_trace(&mut encoder);
+
         {
             let mut cpass = encoder.begin_compute_pass();
 
             cpass.set_pipeline(&self.pipelines.march);
-            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
-            cpass.set_bind_group(1, &self.bind_groups.view, &[]);
-            cpass.set_bind_group(2, &self.bind_groups.march, &[]);
+            cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
             cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
-
         {
             let mut cpass = encoder.begin_compute_pass();
             cpass.set_pipeline(&self.pipelines.depth_shade);
-            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
-            cpass.set_bind_group(1, &self.bind_groups.view, &[]);
-            cpass.set_bind_group(2, &self.bind_groups.depth_shade, &[]);
+            cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
             cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
 
@@ -174,40 +163,18 @@ impl RenderContext {
 
         self.copy_to_swapchain_by_screen_quad(&sc_rpass_desc, &mut encoder);
 
-        self.imgui_render(&sc_rpass_desc, render_desc.window, render_desc.delta_time, render_desc.cam_orientation, &mut encoder);
+        // self.imgui_render(&sc_rpass_desc, render_desc.window, render_desc.delta_time, render_desc.cam_orientation, &mut encoder);
 
         self.queue.submit(Some(encoder.finish()));
     }
 
-    pub fn construct_sum_volume(&self, encoder: &mut wgpu::CommandEncoder) {
-        // Fill sum table with initial ones from map
-        {
-            let mut cpass = encoder.begin_compute_pass();
-            
-            cpass.set_pipeline(&self.pipelines.fill_sum_table);
-            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
-            cpass.set_bind_group(1, &self.bind_groups.edit_sum_table, &[]);
-            cpass.dispatch(8, 8, 8);
-        }
-
-        self.pipelines.sum_table_passes
-        .iter()
-        .for_each(|pipeline| {
-            let mut cpass = encoder.begin_compute_pass();
-            cpass.set_pipeline(pipeline);
-            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
-            cpass.set_bind_group(1, &self.bind_groups.edit_sum_table, &[]);
-            cpass.dispatch(4, 4, 1);
-        });
-    }
-
-    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder) {
+    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, frame: u32) {
         // Fill bit volume from initial uploaded map
         {
             let mut cpass = encoder.begin_compute_pass();
 
             cpass.set_pipeline(&self.pipelines.fill_bit_volume);
-            cpass.set_bind_group(0, &self.bind_groups.map, &[]);
+            cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
             cpass.set_bind_group(1, &self.bind_groups.edit_mono_bit_map_texture, &[]);
             cpass.dispatch(4, 4, 4);
         }
@@ -224,6 +191,13 @@ impl RenderContext {
         });
     }
 
+    pub fn cone_trace(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut cpass = encoder.begin_compute_pass();
+        cpass.set_pipeline(&self.pipelines.cone_march);
+        cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
+        cpass.dispatch((super::resources::CONE_DEPTH_RES_X + 7) / 8, (super::resources::CONE_DEPTH_RES_Y + 7) / 8, 1);
+    }
+
     pub fn copy_to_swapchain_by_screen_quad(&self, 
         sc_rpass_desc: &wgpu::RenderPassDescriptor,
         encoder: &mut wgpu::CommandEncoder) 
@@ -231,7 +205,7 @@ impl RenderContext {
         let mut rpass = encoder.begin_render_pass(sc_rpass_desc);
 
         rpass.set_pipeline(&self.pipelines.process);
-        rpass.set_bind_group(0, &self.bind_groups.process, &[]);
+        rpass.set_bind_group(0, &self.bind_groups.process_layout, &[]);
         rpass.set_vertex_buffer(0, self.resources.buffers.screen_quad.slice(..));
         rpass.draw(0..4, 0..1);
     }
@@ -272,4 +246,5 @@ pub struct RenderDescriptor<'a> {
     pub cam_orientation: na::UnitQuaternion<f32>,
     pub pos: na::Vector3<f32>,
     pub delta_time: f32,
+    pub frame: u32,
 }

@@ -57,7 +57,8 @@ fn main() {
                         map_data: &map_grid,
                         cam_orientation: orientation,
                         pos,
-                        delta_time
+                        delta_time,
+                        frame: frame_count
                     }
                 );
 
@@ -100,3 +101,4 @@ pub fn fill_voxel(coords: [usize ; 3], frame: u32)
         0 // filled
     }
 }
+

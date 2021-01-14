@@ -1,7 +1,7 @@
 #version 460 core
 layout (local_size_x = 2, local_size_y = 2, local_size_z = 2) in;
 
-layout(set = 0, binding = 0, r8ui) uniform uimage3D monoBitMapSource;
+layout(set = 0, binding = 0, r8ui) uniform readonly uimage3D monoBitMapSource;
 layout(set = 0, binding = 1, r8ui) uniform uimage3D monoBitMapOutput;
 
 ivec3 posFromIndex(int index) {
