@@ -4,7 +4,6 @@ pub struct BindGroups {
     pub primary: wgpu::BindGroup,
     pub halve_map_binds: Vec<wgpu::BindGroup>,
     pub edit_mono_bit_map_texture: wgpu::BindGroup,
-    pub process_layout: wgpu::BindGroup,
 }
 
 impl BindGroups {
@@ -25,18 +24,6 @@ impl BindGroups {
                 ),
             primary: create_primary_binds(&device, &views, &bind_group_layouts),
             halve_map_binds: halve_map_binds(&device, &views, &bind_group_layouts),
-            process_layout:
-                device.create_bind_group(
-                    &wgpu::BindGroupDescriptor {
-                        label: None,
-                        layout: &bind_group_layouts.process_layout,
-                        entries: &make_entries(vec![
-                            wgpu::BindingResource::TextureView(&views.color),
-                            wgpu::BindingResource::Sampler(&views.default_sampler)
-                        ])
-                    }
-                ),
-            
         }
     }
 }

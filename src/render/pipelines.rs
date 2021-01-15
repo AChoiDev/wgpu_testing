@@ -29,7 +29,7 @@ impl Pipelines {
             process:
                 make_process_pipeline(&device, 
                     &sc_desc, 
-                    &[&bind_group_layouts.process_layout]
+                    &[&bind_group_layouts.primary_layout]
                 ),
             depth_shade: 
                 make_primary_pipeline(&device, &bind_group_layouts,

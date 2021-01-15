@@ -2,7 +2,7 @@
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(set = 0, binding = 0, r32f) uniform image2D outputDepth;
+layout(set = 0, binding = 0, r32f) uniform writeonly image2D outputDepth;
 layout(set = 0, binding = 2) uniform sampler monoBitMapSampler;
 layout(set = 0, binding = 3) uniform utexture3D monoBitMap;
 
@@ -106,8 +106,7 @@ float getConeValue(ivec2 invoc) {
 float coneMarch(vec3 ro, vec3 rd, float c) {
     float t = 0.0;
 
-    int i = 0;
-    while (i < 99) {
+    for(int i = 0; i < 99; i++) {
         vec3 pos = ro + rd * t;
 
         float r = approximateDistance(pos);
@@ -121,7 +120,6 @@ float coneMarch(vec3 ro, vec3 rd, float c) {
 
         t += tDelta;
 
-        i++;
     }
     return t;
 }
@@ -143,4 +141,5 @@ void main() {
     ivec2 writeLocation = ivec2(pixelIndex % width, renderResolution.y + (pixelIndex / width));
 
     imageStore(outputDepth, writeLocation, vec4(coneLength));
+    //imageStore(outputDepth, writeLocation, vec4(0.001));
 }

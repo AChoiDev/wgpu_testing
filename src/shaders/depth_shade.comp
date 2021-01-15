@@ -2,8 +2,8 @@
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(set = 0, binding = 0, r32f) uniform image2D depthInput;
-layout(set = 0, binding = 1, r11f_g11f_b10f) uniform image2D outputColor;
+layout(set = 0, binding = 0, r32f) uniform readonly image2D depthInput;
+layout(set = 0, binding = 1, r11f_g11f_b10f) uniform writeonly image2D outputColor;
 
 void main() {
     ivec2 pixel_pos = ivec2(gl_GlobalInvocationID.xy);
@@ -11,4 +11,6 @@ void main() {
     float rayLength = imageLoad(depthInput, pixel_pos).r;
 
     imageStore(outputColor, pixel_pos, vec4(exp(rayLength * -0.13)));
+
+    //imageStore(outputColor, pixel_pos, vec4(pixel_pos.x % 2, 0.0, 0.0, 1.0));
 }

@@ -129,7 +129,6 @@ impl RenderContext {
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
-
         self.construct_bit_volume(&mut encoder, render_desc.frame);
 
         use super::resources::div_ceil;
@@ -145,12 +144,18 @@ impl RenderContext {
             cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
             cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
+
+        // self.queue.submit(Some(encoder.finish()));
+        // let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {label: None,});
+        // std::thread::sleep(std::time::Duration::from_millis(100));
+
         {
             let mut cpass = encoder.begin_compute_pass();
             cpass.set_pipeline(&self.pipelines.depth_shade);
             cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
             cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
+
 
         let sc_rpass_desc =
             &wgpu::RenderPassDescriptor {
@@ -161,14 +166,19 @@ impl RenderContext {
                 depth_stencil_attachment: None,
             };
 
+
         self.copy_to_swapchain_by_screen_quad(&sc_rpass_desc, &mut encoder);
 
-        // self.imgui_render(&sc_rpass_desc, render_desc.window, render_desc.delta_time, render_desc.cam_orientation, &mut encoder);
+        self.imgui_render(&sc_rpass_desc, render_desc.window, render_desc.delta_time, render_desc.cam_orientation, &mut encoder);
 
         self.queue.submit(Some(encoder.finish()));
+
     }
 
     pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, frame: u32) {
+        if frame != 0 {
+            return;
+        }
         // Fill bit volume from initial uploaded map
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -205,7 +215,7 @@ impl RenderContext {
         let mut rpass = encoder.begin_render_pass(sc_rpass_desc);
 
         rpass.set_pipeline(&self.pipelines.process);
-        rpass.set_bind_group(0, &self.bind_groups.process_layout, &[]);
+        rpass.set_bind_group(0, &self.bind_groups.primary, &[]);
         rpass.set_vertex_buffer(0, self.resources.buffers.screen_quad.slice(..));
         rpass.draw(0..4, 0..1);
     }

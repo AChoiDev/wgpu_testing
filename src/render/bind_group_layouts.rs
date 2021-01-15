@@ -4,7 +4,6 @@ pub struct BindGroupLayouts {
     pub primary_layout: wgpu::BindGroupLayout,
     pub halve_map: wgpu::BindGroupLayout,
     pub edit_map: wgpu::BindGroupLayout,
-    pub process_layout: wgpu::BindGroupLayout,
 }
 
 impl BindGroupLayouts {
@@ -14,7 +13,6 @@ impl BindGroupLayouts {
             primary_layout: create_primary_layout(&device),
             halve_map: halve_map_layout(&device),
             edit_map: edit_map_layout(&device),
-            process_layout: process_layout(&device),
         }
     }
 }
@@ -37,8 +35,8 @@ fn byte_map_storage_texture(readonly: bool) -> wgpu::BindingType {
 
 
 fn create_primary_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    bind_group_layout_compute(&device, 
-        &[
+    let binding_types = 
+        vec![
             // regular depth
             depth_storage_texture(),
             // main color texture
@@ -62,7 +60,18 @@ fn create_primary_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                 dynamic: false,
                 min_binding_size: None,
             },
-        ]
+        ];
+    
+    device.create_bind_group_layout(
+        &wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries:
+                &make_entries_visible(
+                    make_compute_entries(&binding_types),
+                    &[0, 1],
+                    wgpu::ShaderStage::COMPUTE | wgpu::ShaderStage::FRAGMENT
+                )
+        }
     )
 }
 
@@ -108,8 +117,8 @@ fn process_entries()
 -> Vec<wgpu::BindGroupLayoutEntry> {
     vec![
         wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStage::FRAGMENT,
+            binding: 1,
+            visibility: wgpu::ShaderStage::COMPUTE | wgpu::ShaderStage::FRAGMENT,
             ty: 
                 wgpu::BindingType::SampledTexture {
                     dimension: wgpu::TextureViewDimension::D2,
@@ -119,8 +128,8 @@ fn process_entries()
             count: None,
         },
         wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStage::FRAGMENT,
+            binding: 2,
+            visibility: wgpu::ShaderStage::COMPUTE | wgpu::ShaderStage::FRAGMENT,
             ty: 
                 wgpu::BindingType::Sampler {
                     comparison: false,
@@ -128,6 +137,20 @@ fn process_entries()
             count: None,
         }
     ]
+}
+
+fn make_entries_visible(entries: Vec<wgpu::BindGroupLayoutEntry>, indices: &[usize], visibility: wgpu::ShaderStage) 
+-> Vec<wgpu::BindGroupLayoutEntry> {
+
+    let mut new_entries = entries.clone();
+    
+    indices
+    .iter()
+    .for_each(|&i|
+        new_entries[i].visibility = visibility
+    );
+
+    new_entries
 }
 
 fn bind_group_layout_compute(device: &wgpu::Device, binding_types: &[wgpu::BindingType]) 

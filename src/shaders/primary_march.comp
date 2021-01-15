@@ -66,30 +66,32 @@ bool insideBox3D(vec3 v, vec3 bottomLeft, vec3 topRight) {
     return (s.x * s.y * s.z) == 1.0; 
 }
 
-float getInputDepth(ivec2 invoc) {
-  ivec2 coneCoords = invoc / 8;
+ivec2 getReadLocation(ivec2 invoc) {
+  ivec2 coneCoords = invoc >> 3;
 
-  ivec2 coneDepthDims = (renderResolution + ivec2(7)) / 8;
+  ivec2 coneDepthDims = (renderResolution + ivec2(7)) >> 3;
 
   int pixelIndex = coneCoords.x + coneCoords.y * coneDepthDims.x;
   
-  ivec2 readLocation = ivec2(pixelIndex % renderResolution.x, renderResolution.y + (pixelIndex / renderResolution.x));
+  return ivec2(mod(pixelIndex, renderResolution.x), renderResolution.y + (pixelIndex / renderResolution.x));
+}
 
-  
-  return imageLoad(depth, readLocation).r;
+float getInputDepth(ivec2 invoc) {
+
+  // return 0.0;
+  return imageLoad(depth, getReadLocation(invoc)).r;
 }
 
 
 vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
   hit = false;
-  float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy)) - 0.00001;
-  int i = 0;
+  float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy));
+  //float t = 0.0;
   
   vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
   vec3 corner = step(0, d);
 
-  while (i <= 200) {
-    i++;
+  while (t < 40.0) {
     vec3 p = p0 + d * t;
 
     if (!insideBox3D(p, vec3(0), vec3(32))) {
@@ -112,14 +114,15 @@ vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
 void main() {
     ivec2 invoc = ivec2(gl_GlobalInvocationID.xy);
 
-
-    // imageStore(depth, invoc, vec4(getInputDepth(invoc)));
-    // return;
+    if (invoc.x >= renderResolution.x || invoc.y >= renderResolution.y) {
+      return;
+    }
 
     bool hit;
     vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
+
     if (!hit) {
-      imageStore(depth, invoc, vec4(40.0));
+      imageStore(depth, invoc, vec4(20.0));
       return;
     }
 
