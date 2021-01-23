@@ -118,6 +118,9 @@ void main() {
       return;
     }
 
+    //imageStore(depth, invoc, vec4(getInputDepth(invoc)));
+    //return;
+
     bool hit;
     vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
 

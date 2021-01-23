@@ -5,7 +5,7 @@ pub const WINDOW_X: u32 = 1920;
 pub const WINDOW_Y: u32 = 1080;
 pub const RENDER_RES_X: u32 = 480;
 pub const RENDER_RES_Y: u32 = 270;
-mod byte_grid;
+mod map_3D;
 mod render;
 mod displaced_chunks;
 
@@ -25,9 +25,9 @@ fn main() {
 
     let mut input = winit_input_helper::WinitInputHelper::new();
 
-    let mut map_grid = byte_grid::ByteGrid::new(32);
+    //let mut map_grid = map_3D::Map3D::new(32);
 
-    let mut displaced_chunks = DisplacedChunks::<byte_grid::ByteGrid>::new(displaced_chunks::radius_displacement_set(6));
+    let mut displaced_chunks = DisplacedChunks::<map_3D::Map3D<u8>>::new();
 
     let mut frame_count = 0u32;
     let mut frame_time = std::time::Instant::now();
@@ -40,6 +40,8 @@ fn main() {
 
         match event {
             winit::event::Event::MainEventsCleared => {
+                displaced_chunks.try_initialize(na::zero());
+
                 window.request_redraw();
             },
             winit::event::Event::RedrawRequested(_window_id) => {
@@ -47,15 +49,11 @@ fn main() {
                 let delta_time = frame_time.elapsed().as_secs_f32();
                 frame_time = std::time::Instant::now();
 
-                map_grid.set_all(
-                    &(|coords| fill_voxel(coords, frame_count))
-                );
-
                 render_context.render(
                     RenderDescriptor {
                         window: &window,
-                        map_data: &map_grid,
                         cam_orientation: orientation,
+                        map_data: displaced_chunks.clean_dirty_chunks(),
                         pos,
                         delta_time,
                         frame: frame_count

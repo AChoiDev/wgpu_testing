@@ -1,10 +1,10 @@
-pub struct ByteGrid {
-    data: Vec<u8>,
+pub struct Map3D<T: Clone + Default + Copy> {
+    data: Vec<T>,
     length: usize,
 }
 
 #[allow(dead_code)]
-impl ByteGrid {
+impl<T: Clone + Default + Copy> Map3D<T> {
 
     pub fn length(&self) 
     -> usize {
@@ -13,7 +13,7 @@ impl ByteGrid {
     pub fn new(length: usize) 
     -> Self {
         Self {
-            data: vec![0 ; length.pow(3)],
+            data: vec![T::default() ; length.pow(3)],
             length,
         }
     }
@@ -35,16 +35,16 @@ impl ByteGrid {
     }
 
     pub fn get(&self, coords: [usize ; 3]) 
-    -> u8 {
+    -> T {
         self.data[self.index(coords)]
     }
 
-    pub fn set(&mut self, coords: [usize ; 3], value: u8) {
+    pub fn set(&mut self, coords: [usize ; 3], value: T) {
         let i = self.index(coords);
         self.data[i] = value
     }
 
-    pub fn set_all(&mut self, value_fn : &dyn Fn([usize ; 3]) -> u8) {
+    pub fn set_all(&mut self, value_fn : &dyn Fn([usize ; 3]) -> T) {
         let length = self.length;
         self.data
         .iter_mut()
@@ -53,17 +53,17 @@ impl ByteGrid {
     }
 
     pub fn full_slice(&self) 
-    -> &[u8] {
+    -> &[T] {
         &self.data
     }
 }
 
-use nalgebra as na;
-impl super::displaced_chunks::ChunkData for ByteGrid {
-    fn allocate() -> Self {
-        ByteGrid::new(32)
-    }
 
+use nalgebra as na;
+impl super::displaced_chunks::ChunkData for Map3D<u8> {
+    fn allocate() -> Self {
+        Map3D::new(32)
+    }
 
     fn initialize(&mut self, world_chunk_coords: na::Vector3<i32>) {
         self.set_all(

@@ -13,6 +13,7 @@ winit_input_helper = "0.9.0"
 futures = "0.3.8"
 bytemuck = "1.4.1"
 nalgebra = "0.24.0"
+indexmap = "1.6.1"
 
 imgui-wgpu = "0.12.0"
 imgui = "0.6.1"

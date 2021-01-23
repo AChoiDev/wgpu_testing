@@ -1,4 +1,4 @@
-use crate::byte_grid::ByteGrid;
+use crate::map_3D::Map3D;
 use nalgebra as na;
 
 
@@ -106,20 +106,25 @@ impl RenderContext {
                 }
             );
 
-        self.queue.write_texture(
-            self.resources.map_texture_copy_view(),
-            render_desc.map_data.full_slice(),
-            wgpu::TextureDataLayout {
-                offset: 0,
-                bytes_per_row: 32,
-                rows_per_image: 32,
-            },
-            wgpu::Extent3d {
-                width: 32,
-                height: 32,
-                depth: 32,
-            }
+        render_desc.map_data
+        .iter()
+        .for_each(|m|
+            self.queue.write_texture(
+                self.resources.map_texture_copy_view_by_index(m.0 as u32),
+                m.1.full_slice(),
+                wgpu::TextureDataLayout {
+                    offset: 0,
+                    bytes_per_row: 32,
+                    rows_per_image: 32,
+                },
+                wgpu::Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 32,
+                }
+            )
         );
+
 
         // upload once-per-frame view buffers
         {
@@ -144,10 +149,6 @@ impl RenderContext {
             cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
             cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
         }
-
-        // self.queue.submit(Some(encoder.finish()));
-        // let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {label: None,});
-        // std::thread::sleep(std::time::Duration::from_millis(100));
 
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -176,9 +177,6 @@ impl RenderContext {
     }
 
     pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, frame: u32) {
-        if frame != 0 {
-            return;
-        }
         // Fill bit volume from initial uploaded map
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -252,7 +250,7 @@ fn swapchain_only_color_attachments(
 
 pub struct RenderDescriptor<'a> {
     pub window: &'a winit::window::Window,
-    pub map_data: &'a ByteGrid,
+    pub map_data: Vec<(usize, &'a Map3D<u8>)>,
     pub cam_orientation: na::UnitQuaternion<f32>,
     pub pos: na::Vector3<f32>,
     pub delta_time: f32,

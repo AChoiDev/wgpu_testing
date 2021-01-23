@@ -1,5 +1,4 @@
 
-
 pub struct BindGroups {
     pub primary: wgpu::BindGroup,
     pub halve_map_binds: Vec<wgpu::BindGroup>,
@@ -42,7 +41,6 @@ fn halve_map_binds<'a>(device: &wgpu::Device, views: &'a super::resource_views::
 }
 
 
-
 fn create_primary_binds<'a>(device: &wgpu::Device, views: &'a super::resource_views::ResourceViews, bind_group_layouts: &super::bind_group_layouts::BindGroupLayouts) -> wgpu::BindGroup {
     device.create_bind_group(
         &wgpu::BindGroupDescriptor {
@@ -75,7 +73,6 @@ fn create_primary_binds<'a>(device: &wgpu::Device, views: &'a super::resource_vi
 }
 
 
-
 fn edit_mono_bit_map_entries<'a>(views: &'a super::resource_views::ResourceViews) 
 -> Vec<wgpu::BindGroupEntry<'a>> {
     make_entries(
@@ -86,7 +83,6 @@ fn edit_mono_bit_map_entries<'a>(views: &'a super::resource_views::ResourceViews
         ]
     )
 }
-
 
 pub fn halve_map_entries<'a>(views: &'a super::resource_views::ResourceViews, target_level: usize) 
 -> Vec<wgpu::BindGroupEntry<'a>> {

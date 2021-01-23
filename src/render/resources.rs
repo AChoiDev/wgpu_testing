@@ -2,6 +2,8 @@ use wgpu::util::DeviceExt;
 
 pub const MONO_BIT_LEVELS: u32 = 4;
 
+const CHUNKS_WIDTH: u32 = 12;
+
 pub struct Resources {
     pub render_textures: RenderTextures,
     pub map_texture: wgpu::Texture,
@@ -11,12 +13,32 @@ pub struct Resources {
 }
 
 impl Resources {
-    pub fn map_texture_copy_view(&self) 
+
+    pub fn map_texture_copy_view_by_index(&self, index: u32)
+    -> wgpu::TextureCopyView {
+        let chunk_offset = Resources::coords(index, CHUNKS_WIDTH);
+        self.map_texture_copy_view(chunk_offset)
+    }
+
+    pub fn coords(index: u32, length: u32) 
+    -> [u32 ; 3] {
+        [
+            index % length,
+            (index / length) % length,
+            index / length.pow(2),
+        ]
+    }
+    fn map_texture_copy_view(&self, chunk_offset: [u32 ; 3]) 
     -> wgpu::TextureCopyView {
             wgpu::TextureCopyView {
                 texture: &self.map_texture,
                 mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
+                origin: 
+                    wgpu::Origin3d {
+                        x: 32 * chunk_offset[0],
+                        y: 32 * chunk_offset[1],
+                        z: 32 * chunk_offset[2],
+                    },
             }
     }
 
@@ -46,9 +68,9 @@ pub fn create_map(device: &wgpu::Device) -> wgpu::Texture {
             label: None,
             size: 
                 wgpu::Extent3d {
-                    width: 32,
-                    height: 32,
-                    depth: 32,
+                    width: 32 * CHUNKS_WIDTH,
+                    height: 32 * CHUNKS_WIDTH,
+                    depth: 32 * CHUNKS_WIDTH,
                 },
             mip_level_count: 1,
             sample_count: 1,
@@ -67,9 +89,9 @@ pub fn create_mono_bit_map(device: &wgpu::Device) -> wgpu::Texture {
             label: None,
             size: 
                 wgpu::Extent3d {
-                    width: 16,
-                    height: 16,
-                    depth: 16,
+                    width: 16 * CHUNKS_WIDTH,
+                    height: 16 * CHUNKS_WIDTH,
+                    depth: 16 * CHUNKS_WIDTH,
                 },
             mip_level_count: MONO_BIT_LEVELS,
             sample_count: 1,

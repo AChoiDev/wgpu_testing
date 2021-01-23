@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use indexmap::IndexSet;
 
 use nalgebra as na;
 
@@ -8,6 +9,7 @@ struct Chunk<T: ChunkData> {
     data: T,
     displacement: VectorInt,
     initialized: bool,
+    dirty: bool,
 }
 
 
@@ -21,21 +23,22 @@ pub struct DisplacedChunks<T : ChunkData>
     chunks : Vec<Chunk<T>>,
 
     // The set of all possible chunk displacements
-    displacement_set : HashSet<VectorInt>,
+    displacement_set : IndexSet<VectorInt>,
 }
 
 
 impl<T : ChunkData> DisplacedChunks<T>
 {
-    pub fn new(displacement_set : HashSet<na::Vector3<i32>>)
+    pub fn new()
         -> DisplacedChunks<T>
     {
-        let num = displacement_set.len();
+        let displacement_set = radius_displacement_set(6);
+
 
         let chunks = 
             displacement_set
             .iter()
-            .map(|&displacement| Chunk { data: T::allocate(), displacement, initialized: false})
+            .map(|&displacement| Chunk { data: T::allocate(), displacement, initialized: false, dirty: false})
             .collect();
 
         DisplacedChunks 
@@ -44,7 +47,38 @@ impl<T : ChunkData> DisplacedChunks<T>
             displacement_set,
         }
     }
-    
+
+    // obtains mutable reference to dirty chunks
+    fn get_mut_dirty_chunks(&mut self) -> Vec<(usize, &mut Chunk<T>)>{
+        self.chunks
+        .iter_mut()
+        .enumerate()
+        .filter_map(|(i, c)|
+            if c.dirty {Some((i, c))}
+            else {None}
+        )
+        .collect()
+    }
+
+    fn get_index_map(&self) {
+        //let map = map_
+    }
+
+
+    pub fn clean_dirty_chunks(&mut self) -> Vec<(usize, &T)> {
+        let mut dirty_chunks = self.get_mut_dirty_chunks();
+
+        dirty_chunks
+        .iter_mut()
+        .for_each(|(_, m)|
+            m.dirty = false
+        );
+
+        dirty_chunks
+        .into_iter()
+        .map(|(i, m)| (i, &m.data))
+        .collect()
+    }
 
 
     pub fn len(&self)
@@ -63,10 +97,12 @@ impl<T : ChunkData> DisplacedChunks<T>
             Self::mag_squared(self.chunks[index].displacement))
     }
     
-    fn try_initialize(&mut self, world_chunk_coords: VectorInt) {
+    pub fn try_initialize(&mut self, world_chunk_coords: VectorInt) {
         if let Some(index) = self.closest_uninitialized_chunk_index() {
             let chunk = &mut self.chunks[index];
             chunk.data.initialize(world_chunk_coords + chunk.displacement);
+            chunk.initialized = true;
+            chunk.dirty = true;
         }
     }
 
@@ -85,7 +121,7 @@ impl<T : ChunkData> DisplacedChunks<T>
     pub fn displace(&mut self, displacement : na::Vector3<i32>)
         -> Vec<usize>
     {
-        let mut occupied_displacement_set = HashSet::new();
+        let mut occupied_displacement_set = IndexSet::new();
         let mut invalid_indices = Vec::new();
 
         // The chunks are displaced in this loop
@@ -134,7 +170,7 @@ pub trait ChunkData {
 
 
 pub fn radius_displacement_set(view_radius : usize)
-        -> HashSet<na::Vector3<i32>>
+        -> IndexSet<na::Vector3<i32>>
     {
         let mut displacement_set = HashSet::new();
 
@@ -156,7 +192,7 @@ pub fn radius_displacement_set(view_radius : usize)
 
         }}}
 
-        displacement_set
+        displacement_set.into_iter().collect()
     }
 
 
