@@ -132,30 +132,6 @@ impl RenderContext {
             )
         );
 
-        // upload dirty chunks
-        // render_desc.map_data
-        // .iter()
-        // .for_each(|m|
-        //     self.queue.write_texture(
-        //         self.resources.map_texture_copy_view_by_index(m.0 as u32),
-        //         m.1.full_slice(),
-        //         wgpu::TextureDataLayout {
-        //             offset: 0,
-        //             bytes_per_row: 32,
-        //             rows_per_image: 32,
-        //         },
-        //         wgpu::Extent3d {
-        //             width: 32,
-        //             height: 32,
-        //             depth: 32,
-        //         }
-        //     )
-        // );
-
-        // render_desc.map_data
-        // .iter()
-
-
         // upload displacement index map
         self.queue.write_texture(
             self.resources.displacement_index_map_copy_view(),
@@ -178,21 +154,10 @@ impl RenderContext {
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
-        // self.construct_bit_volume(&mut encoder, render_desc.frame);
 
         use super::resources::div_ceil;
 
         let res_dispatch = [div_ceil(crate::RENDER_RES_X, 8), div_ceil(crate::RENDER_RES_Y, 8)];
-
-        // self.cone_trace(&mut encoder);
-
-        // {
-        //     let mut cpass = encoder.begin_compute_pass();
-
-        //     cpass.set_pipeline(&self.pipelines.march);
-        //     cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
-        //     cpass.dispatch(res_dispatch[0], res_dispatch[1], 1);
-        // }
 
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -227,35 +192,6 @@ impl RenderContext {
 
     }
 
-    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, frame: u32) {
-        // Fill bit volume from initial uploaded map
-        {
-            let mut cpass = encoder.begin_compute_pass();
-
-            cpass.set_pipeline(&self.pipelines.fill_bit_volume);
-            cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
-            cpass.set_bind_group(1, &self.bind_groups.edit_mono_bit_map_texture, &[]);
-            cpass.dispatch(4, 4, 4);
-        }
-
-        [2, 1, 0]
-        .iter()
-        .map(|&i| 2u32.pow(i))
-        .enumerate()
-        .for_each(|(i, d)| {
-            let mut cpass = encoder.begin_compute_pass();
-            cpass.set_pipeline(&self.pipelines.halve_bit_volume);
-            cpass.set_bind_group(0, &self.bind_groups.halve_map_binds[i], &[]);
-            cpass.dispatch(d, d, d);
-        });
-    }
-
-    pub fn cone_trace(&self, encoder: &mut wgpu::CommandEncoder) {
-        let mut cpass = encoder.begin_compute_pass();
-        cpass.set_pipeline(&self.pipelines.cone_march);
-        cpass.set_bind_group(0, &self.bind_groups.primary, &[]);
-        cpass.dispatch((super::resources::CONE_DEPTH_RES_X + 7) / 8, (super::resources::CONE_DEPTH_RES_Y + 7) / 8, 1);
-    }
 
     pub fn copy_to_swapchain_by_screen_quad(&self, 
         sc_rpass_desc: &wgpu::RenderPassDescriptor,

@@ -100,41 +100,6 @@ fn halve_map_layout(device: &wgpu::Device)
 
 
 
-fn process_layout(device: &wgpu::Device) 
--> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(
-        & wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &process_entries(),
-        }
-    )
-}
-
-fn process_entries()
--> Vec<wgpu::BindGroupLayoutEntry> {
-    vec![
-        wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStage::COMPUTE | wgpu::ShaderStage::FRAGMENT,
-            ty: 
-                wgpu::BindingType::SampledTexture {
-                    dimension: wgpu::TextureViewDimension::D2,
-                    component_type: wgpu::TextureComponentType::Float,
-                    multisampled: false,
-                },
-            count: None,
-        },
-        wgpu::BindGroupLayoutEntry {
-            binding: 2,
-            visibility: wgpu::ShaderStage::COMPUTE | wgpu::ShaderStage::FRAGMENT,
-            ty: 
-                wgpu::BindingType::Sampler {
-                    comparison: false,
-                },
-            count: None,
-        }
-    ]
-}
 
 fn make_entries_visible(entries: Vec<wgpu::BindGroupLayoutEntry>, indices: &[usize], visibility: wgpu::ShaderStage) 
 -> Vec<wgpu::BindGroupLayoutEntry> {

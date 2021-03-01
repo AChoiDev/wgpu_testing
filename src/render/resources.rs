@@ -1,30 +1,19 @@
 use wgpu::util::DeviceExt;
 
 
-pub const MONO_BIT_LEVELS: u32 = 4;
-
 const CHUNKS_WIDTH: u32 = 13;
 
 //const
 
 pub struct Resources {
     pub render_textures: RenderTextures,
-    pub map_texture: wgpu::Texture,
     pub oct_map_texture: wgpu::Texture,
-    pub mono_bit_map_texture: wgpu::Texture,
     pub buffers: Buffers,
     pub default_sampler: wgpu::Sampler,
     pub displacement_index_map: wgpu::Texture,
 }
 
 impl Resources {
-
-    pub fn map_texture_copy_view_by_index(&self, index: u32)
-    -> wgpu::TextureCopyView {
-        let chunk_offset = Resources::coords(index, CHUNKS_WIDTH);
-        self.map_texture_copy_view(chunk_offset)
-    }
-
     pub fn coords(index: u32, length: u32) 
     -> [u32 ; 3] {
         [
@@ -33,19 +22,7 @@ impl Resources {
             index / length.pow(2),
         ]
     }
-    fn map_texture_copy_view(&self, chunk_offset: [u32 ; 3]) 
-    -> wgpu::TextureCopyView {
-            wgpu::TextureCopyView {
-                texture: &self.map_texture,
-                mip_level: 0,
-                origin: 
-                    wgpu::Origin3d {
-                        x: 32 * chunk_offset[0],
-                        y: 32 * chunk_offset[1],
-                        z: 32 * chunk_offset[2],
-                    },
-            }
-    }
+    
 
     fn oct_map_texture_copy_view(&self, chunk_offset: [u32 ; 3]) 
     -> wgpu::TextureCopyView {
@@ -91,9 +68,7 @@ impl Resources {
         Self {
             render_textures,
             buffers,
-            map_texture: create_map(&device),
             oct_map_texture: create_oct_map(&device),
-            mono_bit_map_texture: create_mono_bit_map(&device),
             displacement_index_map: create_displacement_index_map(&device),
             default_sampler,
         }
@@ -122,26 +97,6 @@ pub fn create_displacement_index_map(device: &wgpu::Device) -> wgpu::Texture {
     )
 }
 
-pub fn create_map(device: &wgpu::Device) -> wgpu::Texture {
-    device.create_texture(
-        &wgpu::TextureDescriptor {
-            label: None,
-            size: 
-                wgpu::Extent3d {
-                    width: 32 * CHUNKS_WIDTH,
-                    height: 32 * CHUNKS_WIDTH,
-                    depth: 32 * CHUNKS_WIDTH,
-                },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::R8Uint,
-            usage:
-                wgpu::TextureUsage::COPY_DST |
-                wgpu::TextureUsage::STORAGE,
-        }
-    )
-}
 
 
 pub fn create_oct_map(device: &wgpu::Device) -> wgpu::Texture {
@@ -165,26 +120,6 @@ pub fn create_oct_map(device: &wgpu::Device) -> wgpu::Texture {
     )
 }
 
-pub fn create_mono_bit_map(device: &wgpu::Device) -> wgpu::Texture {
-    device.create_texture(
-        &wgpu::TextureDescriptor {
-            label: None,
-            size: 
-                wgpu::Extent3d {
-                    width: 16 * CHUNKS_WIDTH,
-                    height: 16 * CHUNKS_WIDTH,
-                    depth: 16 * CHUNKS_WIDTH,
-                },
-            mip_level_count: MONO_BIT_LEVELS,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::R8Uint,
-            usage:
-                wgpu::TextureUsage::SAMPLED |
-                wgpu::TextureUsage::STORAGE,
-        }
-    )
-}
 
 #[allow(dead_code)]
 pub struct RenderTextures {
@@ -252,9 +187,6 @@ fn depth_res(res: [u32 ; 2])
 
 pub const CONE_DEPTH_SCALE: u32 = 8;
 
-
-pub const CONE_DEPTH_RES_X: u32 = div_ceil(crate::RENDER_RES_X, 8);
-pub const CONE_DEPTH_RES_Y: u32 = div_ceil(crate::RENDER_RES_Y, 8);
 
 pub fn div_ceil_res(val: [u32 ; 2], divisor: u32) -> [u32 ; 2] {
     [div_ceil(val[0], divisor), div_ceil(val[1], divisor)]
