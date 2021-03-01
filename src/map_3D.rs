@@ -39,6 +39,7 @@ impl<T: Clone + Default + Copy> Map3D<T> {
         self.data[self.index(coords)]
     }
 
+
     pub fn set(&mut self, coords: [usize ; 3], value: T) {
         let i = self.index(coords);
         self.data[i] = value

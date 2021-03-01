@@ -7,6 +7,7 @@ pub struct Pipelines {
     pub depth_shade: wgpu::ComputePipeline,
     pub fill_bit_volume: wgpu::ComputePipeline,
     pub halve_bit_volume: wgpu::ComputePipeline,
+    pub octree_march: wgpu::ComputePipeline,
 }
 
 impl Pipelines {
@@ -47,7 +48,12 @@ impl Pipelines {
                     &device, 
                     &[&bind_group_layouts.halve_map]
                 ),
-            
+            octree_march:
+                make_compute_pipeline(
+                    wgpu::include_spirv!("../spirv/octree_march.comp.spv"),
+                    &device, 
+                    &[&bind_group_layouts.primary_layout]
+                ),
         }
     }
 }

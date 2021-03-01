@@ -39,26 +39,23 @@ fn create_primary_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         vec![
             // regular depth
             depth_storage_texture(),
+
             // main color texture
             wgpu::BindingType::StorageTexture {
                 dimension: wgpu::TextureViewDimension::D2,
                 format: wgpu::TextureFormat::Rg11b10Float,
                 readonly: false,
             },
-
-            // mono bit map
-            wgpu::BindingType::Sampler { comparison: false },
-            wgpu::BindingType::SampledTexture {
-                dimension: wgpu::TextureViewDimension::D3,
-                component_type: wgpu::TextureComponentType::Uint,
-                multisampled: false,
-            },
-
-            byte_map_storage_texture(true), // map
             // view buffer
             wgpu::BindingType::UniformBuffer {
                 dynamic: false,
                 min_binding_size: None,
+            },
+
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R16Uint,
+                readonly: true,
             },
         ];
     

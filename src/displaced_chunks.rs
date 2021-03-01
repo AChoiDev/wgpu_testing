@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use indexmap::IndexSet;
+use super::map_3D::Map3D;
 
 use nalgebra as na;
 
@@ -32,8 +33,12 @@ impl<T : ChunkData> DisplacedChunks<T>
     pub fn new()
         -> DisplacedChunks<T>
     {
-        let displacement_set = radius_displacement_set(6);
-
+        let displacement_set = {
+            let mut set = radius_displacement_set(4);
+            set.sort_by(|&a, &b| (Self::mag_squared(a)).cmp(&Self::mag_squared(b)));
+            set
+        };
+        println!("chunk_count: {}", displacement_set.len());
 
         let chunks = 
             displacement_set
@@ -60,8 +65,32 @@ impl<T : ChunkData> DisplacedChunks<T>
         .collect()
     }
 
-    fn get_index_map(&self) {
-        //let map = map_
+    pub fn get_index_map(&self) -> Map3D<u16> {
+
+        //Self::inter_int()
+        let mut map = Map3D::<u16>::new(13);
+
+        self.chunks
+        .iter()
+        .enumerate()
+        .filter_map(|(i, m)| if m.initialized {Some((i, Self::inter_coords(m.displacement.into())))} else {None})
+        .for_each(|(i, coords)| 
+            map.set(coords, i as u16)
+        );
+
+        map
+    }
+
+    fn inter_coords(coords: [i32 ; 3]) -> [usize ; 3] {
+        [
+            Self::inter_int(coords[0]),
+            Self::inter_int(coords[1]),
+            Self::inter_int(coords[2])
+        ]
+    }
+
+    fn inter_int(num: i32) -> usize {
+        ((num * 2).abs() + (num.signum() - 1) / 2) as usize
     }
 
 
