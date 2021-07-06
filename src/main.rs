@@ -1,5 +1,7 @@
+use std::iter::Map;
 
 use displaced_chunks::DisplacedChunks;
+use map_3D::Map3D;
 use render::render_context::RenderDescriptor;
 //use octree_texture::OctreeTexture;
 
@@ -13,6 +15,7 @@ mod displaced_chunks;
 mod octree_texture;
 
 use nalgebra as na;
+use octree_texture::OctreeTexture;
 
 fn main() {
     let event_loop = winit::event_loop::EventLoop::new();
