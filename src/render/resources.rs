@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 
-
-const CHUNKS_WIDTH: u32 = 13;
+// 
+pub const CHUNK_DATA_LENGTH: u32 = 13 * 3;
 
 //const
 
@@ -11,6 +11,7 @@ pub struct Resources {
     pub buffers: Buffers,
     pub default_sampler: wgpu::Sampler,
     pub displacement_index_map: wgpu::Texture,
+    pub upload_map_texture: wgpu::Texture,
 }
 
 impl Resources {
@@ -21,6 +22,30 @@ impl Resources {
             (index / length) % length,
             index / length.pow(2),
         ]
+    }
+
+    pub fn upload_map_copy_view(&self)
+    -> wgpu::TextureCopyView {
+        wgpu::TextureCopyView {
+            texture: &self.upload_map_texture,
+            mip_level: 0,
+            origin:
+                wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                },
+        }
+    }
+
+    pub fn oct_map_origin(index: u32) -> [u32 ; 3] {
+        let chunk_offset = Resources::coords(index, CHUNK_DATA_LENGTH);
+        let octree_chunk_size = crate::octree_texture::OCTUPLE_DATA_MAP_SIZE as u32;
+        return [
+            chunk_offset[0] * octree_chunk_size,
+            chunk_offset[1] * octree_chunk_size,
+            chunk_offset[2] * octree_chunk_size
+        ];
     }
     
 
@@ -42,7 +67,7 @@ impl Resources {
 
     pub fn oct_map_texture_copy_view_by_index(&self, index: u32)
     -> wgpu::TextureCopyView {
-        let chunk_offset = Resources::coords(index, CHUNKS_WIDTH);
+        let chunk_offset = Resources::coords(index, CHUNK_DATA_LENGTH);
         self.oct_map_texture_copy_view(chunk_offset)
     }
 
@@ -71,9 +96,33 @@ impl Resources {
             oct_map_texture: create_oct_map(&device),
             displacement_index_map: create_displacement_index_map(&device),
             default_sampler,
+            upload_map_texture: create_upload_map(&device),
         }
 
     }
+}
+
+pub fn create_upload_map(device: &wgpu::Device)
+-> wgpu::Texture {
+    let size = 2u32.pow(5);
+    device.create_texture(
+        &wgpu::TextureDescriptor {
+            label: None,
+            size: 
+                wgpu::Extent3d {
+                    width: size,
+                    height: size,
+                    depth: size,
+                },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::R8Uint,
+            usage:
+                wgpu::TextureUsage::STORAGE
+                | wgpu::TextureUsage::COPY_DST,
+        }
+    )
 }
 
 pub fn create_displacement_index_map(device: &wgpu::Device) -> wgpu::Texture {
@@ -82,9 +131,9 @@ pub fn create_displacement_index_map(device: &wgpu::Device) -> wgpu::Texture {
             label: None,
             size: 
                 wgpu::Extent3d {
-                    width: CHUNKS_WIDTH,
-                    height: CHUNKS_WIDTH,
-                    depth: CHUNKS_WIDTH,
+                    width: CHUNK_DATA_LENGTH,
+                    height: CHUNK_DATA_LENGTH,
+                    depth: CHUNK_DATA_LENGTH,
                 },
             mip_level_count: 1,
             sample_count: 1,
@@ -101,7 +150,7 @@ pub fn create_displacement_index_map(device: &wgpu::Device) -> wgpu::Texture {
 
 pub fn create_oct_map(device: &wgpu::Device) -> wgpu::Texture {
     let octree_chunk_size = crate::octree_texture::OCTUPLE_DATA_MAP_SIZE as u32;
-    let width = octree_chunk_size * CHUNKS_WIDTH;
+    let width = octree_chunk_size * CHUNK_DATA_LENGTH;
     device.create_texture(
         &wgpu::TextureDescriptor {
             label: None,
@@ -200,6 +249,7 @@ pub const fn div_ceil(val: u32, divisor: u32)
 pub struct Buffers {
     pub screen_quad: wgpu::Buffer,
     pub trace_frame: wgpu::Buffer,
+    pub upload_map_counter: wgpu::Buffer,
 }
 
 impl Buffers {
@@ -228,9 +278,20 @@ impl Buffers {
                 },
             );
 
+        let upload_map_counter =
+            device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: 
+                        &[0 ; 16],
+                    usage: wgpu::BufferUsage::STORAGE | wgpu::BufferUsage::COPY_DST,
+                },
+            );
+
         Self {
             screen_quad,
             trace_frame,
+            upload_map_counter
         }
     }
 }

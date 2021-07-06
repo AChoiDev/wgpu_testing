@@ -19,6 +19,23 @@ layout(set = 0, binding = 2) uniform Frame {
 
 layout(set = 0, binding = 0, r32f) uniform image2D depth;
 layout(set = 0, binding = 3, r16ui) uniform readonly uimage3D octreeTexture;
+layout(set = 0, binding = 4, r16ui) uniform readonly uimage3D indexMap;
+
+
+ivec3 interCoords(ivec3 coords) {
+    return abs(coords) * 2 + (sign(coords) - ivec3(1)) / 2;
+}
+
+// CHUNK DATA LENGTH
+const int CDL = 13 * 3;
+
+int getMapIndex(ivec3 chunkWorldCoords) {
+  return int(imageLoad(indexMap, interCoords(chunkWorldCoords)).r);
+}
+
+ivec3 getChunkDataCoords(int index) {
+  return ivec3(index % CDL, (index / CDL) % CDL, index / (CDL * CDL)) * 18;
+}
 
 vec2 getUV(ivec2 invoc) {
     vec2 resolution = vec2(renderResolution);
@@ -31,9 +48,11 @@ vec2 getUV(ivec2 invoc) {
 
 const int fiveBitMask = (1 << 5) - 1;
 
-int getNextChild(ivec3 tFloorInt, int cp) {
-    ivec3 coords = 
+int getNextChild(ivec3 tFloorInt, int cp, ivec3 chunkDataCoords) {
+    ivec3 innerCoords = 
         (ivec3((cp) & fiveBitMask, (cp >> 5) & fiveBitMask, (cp >> 10) & fiveBitMask) << 1) + tFloorInt;
+
+    ivec3 coords = innerCoords + chunkDataCoords;
 
     uvec4 imgVal = imageLoad(octreeTexture, coords);
 
@@ -51,7 +70,7 @@ struct RayLevel{
     int cp;
 };
 
-const int MAG = 5;
+const int MAG = 6;
 const int NULL_VALUE = (1 << 16) - 1;
 
 float minComp(vec3 value) {
@@ -70,15 +89,18 @@ vec3 rayTreeTraverse(vec3 origin, vec3 dir) {
     int level = 0;
     vec3 dynEnd = origin;
 
+    ivec3 chunkDataCoords = getChunkDataCoords(getMapIndex(chunkWorldCoords));
+
     for (int i = 0; i < 999; i++) {
         if (level == -1) {
 
           chunkWorldCoords += ivec3(floor(rlStack[0].t * 0.5));
-          rlStack[0].t = mod(rlStack[0].t, vec3(2.0));
-
-          if (chunkWorldCoords.x == -1) {
+          int index = getMapIndex(chunkWorldCoords);
+          if (index == ((1 << 16) - 1)) {
             break;
           }
+          chunkDataCoords = getChunkDataCoords(index);
+          rlStack[0].t = mod(rlStack[0].t, vec3(2.0));
 
           level += 1;
         }
@@ -96,7 +118,7 @@ vec3 rayTreeTraverse(vec3 origin, vec3 dir) {
         vec3 tFloorFloat = floor(rlStack[level].t);
         vec3 tFract = rlStack[level].t - tFloorFloat;
 
-        int nextChild = getNextChild(ivec3(tFloorFloat), rlStack[level].cp);
+        int nextChild = getNextChild(ivec3(tFloorFloat), rlStack[level].cp, chunkDataCoords);
         rlStack[level + 1].t = tFract * 2.0;
         rlStack[level + 1].cp = nextChild;
 

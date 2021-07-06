@@ -29,7 +29,10 @@ impl OctreeTexture {
 
     pub fn new_from_map(map: &Map3D<u8>, magnitude: usize) 
     -> Self {
+        let start_construct_time = std::time::Instant::now();
         let mut oct_text = Self::new(magnitude);
+
+        // println!("map_length: {}", map.length());
 
         for x in 0..map.length() {
         for y in 0..map.length() {
@@ -41,6 +44,9 @@ impl OctreeTexture {
         }
         }
         }
+
+        // println!("construction time: {}", start_construct_time.elapsed().as_secs_f32() * 1000f32);
+        println!("octuple count: {}", oct_text.count);
 
         oct_text
     }
@@ -134,19 +140,29 @@ impl OctreeTexture {
     }
 
     pub fn insert(&mut self, coords: [usize ; 3]) {
+
         let mut octuple_coords = [0usize ; 3];
 
-        for depth in (2usize..self.magnitude).rev() {
+        // let mut allocated_index = self.d_allocate_octuple();
+
+        let mut counter = 0;
+
+        for &depth in [4, 3, 2].iter() {
             let child_index = Self::infer_child_index(coords, depth);
 
             if self.d_is_child_null(octuple_coords, child_index) {
                 let new_location = self.d_allocate_octuple();
+                counter += 1;
                 self.d_set_child(octuple_coords, child_index, new_location);
             }
-
-            octuple_coords = self.d_get_child_usize(octuple_coords, child_index);
+            octuple_coords = Self::u16_format_to_usize_coords(self.d_get_child(octuple_coords, child_index));
         }
 
+        // if counter == 0 {
+            // println!("coords: {:?}", coords);
+        // }
+
+        // end of loop
         let child_index = Self::infer_child_index(coords, 1);
         let sub_child_index = Self::infer_child_index(coords, 0);
 

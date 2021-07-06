@@ -28,32 +28,6 @@ fn main() {
 
     let mut input = winit_input_helper::WinitInputHelper::new();
 
-    {
-        let mut  map = map_3D::Map3D::<u8>::new(32);
-
-        map.set_all(&(|c| fill_voxel(c, 0)));
-
-        let tree = octree_texture::OctreeTexture::new_from_map(&map, 5);
-
-        let mut mistake = false;
-        'outer: for x in 0..32 {
-        for y in 0..32 {
-        for z in 0..32 {
-            let coords = [x, y, z];
-            if (map.get(coords) == 0) != tree.get(coords) {
-                mistake = true;
-                break 'outer;
-            }
-        }
-        }
-        }
-
-        println!("mistake: {}", mistake);
-        println!("node count: {}", tree.total_nodes());
-    }
-
-    //let mut map_grid = map_3D::Map3D::new(32);
-
     let mut displaced_chunks = DisplacedChunks::<map_3D::Map3D<u8>>::new();
 
     let mut frame_count = 0u32;
@@ -78,15 +52,17 @@ fn main() {
 
                 let displacement_index_map_data = displaced_chunks.get_index_map();
 
+                let map_data = displaced_chunks.clean_dirty_chunks();
+
                 render_context.render(
                     RenderDescriptor {
                         window: &window,
                         cam_orientation: orientation,
-                        map_data: displaced_chunks.clean_dirty_chunks(),
+                        map_data,
                         displacement_index_map_data,
                         pos,
                         delta_time,
-                        frame: frame_count
+                        frame: frame_count,
                     }
                 );
 
@@ -120,13 +96,13 @@ fn main() {
     });
 }
 
-pub fn fill_voxel(coords: [usize ; 3], frame: u32) 
+pub fn fill_voxel(coords: [usize ; 3], frame: u32, world_coords: [i32 ; 3]) 
 -> u8 
 {
     let disp = [15 - coords[0] as i32, 15 - coords[1] as i32, 15 - coords[2] as i32];
     let mag_sqr = disp[0] * disp[0] + disp[1] * disp[1] + disp[2] * disp[2];
 
-    if mag_sqr < 19i32.pow(2) && ((frame / 20) % 2 == 0 || coords[1] < 25) {
+    if mag_sqr < 21i32.pow(2) && ((frame / 20) % 2 == 0 || coords[1] < 25) && (world_coords[0] % 2 == 0 || world_coords[2] % 2 == 0) {
         255 // not filled
     } 
     else {

@@ -1,5 +1,6 @@
-use crate::map_3D::Map3D;
+use crate::{map_3D::Map3D, render::resources::Resources};
 use nalgebra as na;
+use wgpu::BufferAddress;
 
 
 #[allow(dead_code)]
@@ -106,13 +107,14 @@ impl RenderContext {
                 }
             );
 
+
+        
         let octrees: Vec<_> =
             render_desc.map_data
             .iter()
             .map(|m|
                 (m.0, crate::octree_texture::OctreeTexture::new_from_map(m.1, 5))
             ).collect();
-
         octrees
         .iter()
         .for_each(|m|
@@ -121,7 +123,7 @@ impl RenderContext {
                 bytemuck::cast_slice(m.1.full_slice()),
                 wgpu::TextureDataLayout {
                     offset: 0,
-                    bytes_per_row: 36,
+                    bytes_per_row: 18 * 2,
                     rows_per_image: 18,
                 },
                 wgpu::Extent3d {
@@ -132,19 +134,13 @@ impl RenderContext {
             )
         );
 
+
         // upload displacement index map
-        self.queue.write_texture(
-            self.resources.displacement_index_map_copy_view(),
-            unsafe { render_desc.displacement_index_map_data.full_slice().align_to::<u8>().1 },
-            wgpu::TextureDataLayout {
-                offset: 0,
-                bytes_per_row: 26,
-                rows_per_image: 13,
-            },
-            wgpu::Extent3d {
-                width: 13, height: 13, depth: 13,
-            }
-        );
+        if let Some(index_map) = render_desc.displacement_index_map_data {
+            self.update_displacement_map(
+                unsafe { index_map.full_slice().align_to::<u8>().1 }
+            );
+        }
 
         // upload view buffers
         {
@@ -189,7 +185,22 @@ impl RenderContext {
         self.imgui_render(&sc_rpass_desc, render_desc.window, render_desc.delta_time, render_desc.cam_orientation, &mut encoder);
 
         self.queue.submit(Some(encoder.finish()));
+    }
 
+    fn update_displacement_map(&self, map: &[u8]) {
+        let CDL = crate::render::resources::CHUNK_DATA_LENGTH;
+        self.queue.write_texture(
+            self.resources.displacement_index_map_copy_view(),
+            map,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: CDL * 2,
+                rows_per_image: CDL,
+            },
+            wgpu::Extent3d {
+                width: CDL, height: CDL, depth: CDL,
+            }
+        );
     }
 
 
@@ -238,7 +249,7 @@ fn swapchain_only_color_attachments(
 pub struct RenderDescriptor<'a> {
     pub window: &'a winit::window::Window,
     pub map_data: Vec<(usize, &'a Map3D<u8>)>,
-    pub displacement_index_map_data: Map3D<u16>,
+    pub displacement_index_map_data: Option<Map3D<u16>>,
     pub cam_orientation: na::UnitQuaternion<f32>,
     pub pos: na::Vector3<f32>,
     pub delta_time: f32,

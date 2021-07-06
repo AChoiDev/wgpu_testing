@@ -1,6 +1,7 @@
 
 pub struct BindGroups {
     pub primary: wgpu::BindGroup,
+    pub uploadMap: wgpu::BindGroup,
 }
 
 impl BindGroups {
@@ -12,8 +13,28 @@ impl BindGroups {
     -> Self {
         Self {
             primary: create_primary_binds(&device, &views, &bind_group_layouts),
+            uploadMap: create_upload_map_binds(&device, &views, &bind_group_layouts)
         }
     }
+}
+
+fn create_upload_map_binds<'a>(device: &wgpu::Device, views: &'a super::resource_views::ResourceViews, bind_group_layouts: &super::bind_group_layouts::BindGroupLayouts) -> wgpu::BindGroup {
+    device.create_bind_group(
+        &wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layouts.upload_map,
+            entries: &make_entries(
+                vec![
+                    wgpu::BindingResource::Buffer(
+                        views.upload_map_counter
+                    ),
+                    wgpu::BindingResource::TextureView(
+                        &views.upload_map,
+                    ),
+                ]
+            )
+        }
+    )
 }
 
 
@@ -36,6 +57,9 @@ fn create_primary_binds<'a>(device: &wgpu::Device, views: &'a super::resource_vi
                     ),
                     wgpu::BindingResource::TextureView(
                         &views.oct_map,
+                    ),
+                    wgpu::BindingResource::TextureView(
+                        &views.index_map,
                     ),
                 ]
             )
