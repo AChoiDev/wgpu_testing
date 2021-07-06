@@ -1,5 +1,5 @@
 mod imgui;
-pub mod resources;
+mod resources;
 mod pipelines;
 mod bind_group_layouts;
 mod bind_groups;

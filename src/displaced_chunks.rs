@@ -34,7 +34,7 @@ impl<T : ChunkData> DisplacedChunks<T>
         -> DisplacedChunks<T>
     {
         let displacement_set = {
-            let mut set = radius_displacement_set(3);
+            let mut set = radius_displacement_set(4);
             set.sort_by(|&a, &b| (Self::mag_squared(a)).cmp(&Self::mag_squared(b)));
             set
         };
@@ -65,16 +65,10 @@ impl<T : ChunkData> DisplacedChunks<T>
         .collect()
     }
 
-    pub fn get_index_map(&self) -> Option<Map3D<u16>> {
-        if self.chunks.iter().all(|c| c.dirty == false) {
-            return None;
-        }
+    pub fn get_index_map(&self) -> Map3D<u16> {
 
-
-        let CDL = crate::render::resources::CHUNK_DATA_LENGTH;
         //Self::inter_int()
-        let mut map = Map3D::<u16>::new(CDL as usize);
-        map.set_all(&(|_| u16::MAX));
+        let mut map = Map3D::<u16>::new(13);
 
         self.chunks
         .iter()
@@ -84,7 +78,7 @@ impl<T : ChunkData> DisplacedChunks<T>
             map.set(coords, i as u16)
         );
 
-        Some(map)
+        map
     }
 
     fn inter_coords(coords: [i32 ; 3]) -> [usize ; 3] {

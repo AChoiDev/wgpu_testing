@@ -67,11 +67,8 @@ impl super::displaced_chunks::ChunkData for Map3D<u8> {
     }
 
     fn initialize(&mut self, world_chunk_coords: na::Vector3<i32>) {
-        let start_construct_time = std::time::Instant::now();
-
         self.set_all(
-            &(|coords| super::fill_voxel(coords, 0, world_chunk_coords.into()))
+            &(|coords| super::fill_voxel(coords, 0))
         );
-        // println!("map_initialize_time: {}", start_construct_time.elapsed().as_secs_f32() * 1000f32);
     }
 }

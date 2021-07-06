@@ -4,7 +4,6 @@ pub struct BindGroupLayouts {
     pub primary_layout: wgpu::BindGroupLayout,
     pub halve_map: wgpu::BindGroupLayout,
     pub edit_map: wgpu::BindGroupLayout,
-    pub upload_map: wgpu::BindGroupLayout,
 }
 
 impl BindGroupLayouts {
@@ -14,7 +13,6 @@ impl BindGroupLayouts {
             primary_layout: create_primary_layout(&device),
             halve_map: halve_map_layout(&device),
             edit_map: edit_map_layout(&device),
-            upload_map: upload_map_layout(&device),
         }
     }
 }
@@ -53,20 +51,12 @@ fn create_primary_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                 dynamic: false,
                 min_binding_size: None,
             },
-            
-            // octree map
-            wgpu::BindingType::StorageTexture {
-                dimension: wgpu::TextureViewDimension::D3,
-                format: wgpu::TextureFormat::R32Uint,
-                readonly: true,
-            },
-            // index map
+
             wgpu::BindingType::StorageTexture {
                 dimension: wgpu::TextureViewDimension::D3,
                 format: wgpu::TextureFormat::R16Uint,
                 readonly: true,
             },
-
         ];
     
     device.create_bind_group_layout(
@@ -93,28 +83,6 @@ fn edit_map_layout(device: &wgpu::Device)
                 format: wgpu::TextureFormat::R8Uint,
                 readonly: false,
             }
-        ]
-    )
-}
-
-fn upload_map_layout(device: &wgpu::Device) 
--> wgpu::BindGroupLayout {
-    bind_group_layout_compute(&device, 
-        &[
-            // wgpu::BindingType::UniformBuffer {
-                // dynamic: false,
-                // min_binding_size: None,
-            // },
-            wgpu::BindingType::StorageBuffer {
-                dynamic: false,
-                min_binding_size: None,
-                readonly: false,
-            },
-            wgpu::BindingType::StorageTexture {
-                dimension: wgpu::TextureViewDimension::D3,
-                format: wgpu::TextureFormat::R8Uint,
-                readonly: false,
-            },
         ]
     )
 }

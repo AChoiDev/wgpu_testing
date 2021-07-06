@@ -4,7 +4,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, r32f) uniform readonly image2D depthInput;
 layout(set = 0, binding = 1, r11f_g11f_b10f) uniform writeonly image2D outputColor;
-layout(set = 0, binding = 3, r32ui) uniform readonly uimage3D indexMap;
+layout(set = 0, binding = 3, r16ui) uniform readonly uimage3D indexMap;
 
 ivec3 interCoords(ivec3 coords) {
     return abs(coords) * 2 + (sign(coords) - ivec3(1)) / 2;
@@ -24,16 +24,12 @@ void main() {
         int fiveBitMask = (1 << 5) - 1;
         ivec3 coordsIndex = ivec3((indexValue) & fiveBitMask, (indexValue >> 5) & fiveBitMask, (indexValue >> 10) & fiveBitMask);
         vec3 visualIndex = vec3(coordsIndex) * 0.1;
-        visualIndex = vec3(1.0, 0.0, 0.0);
-        if (indexValue == ((1 << 16) - 1)) {
+        if (indexValue == (1 << 16) - 1) {
             visualIndex = vec3(0.0);
         }
         imageStore(outputColor, pixel_pos, vec4(visualIndex, 0.0));
         return; 
     }
 
-
-    // if 
-
-    imageStore(outputColor, pixel_pos, vec4(exp(rayLength * -0.06)));
+    imageStore(outputColor, pixel_pos, vec4(exp(rayLength * -0.016)));
 }
