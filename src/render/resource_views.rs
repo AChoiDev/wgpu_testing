@@ -4,7 +4,6 @@ pub struct ResourceViews<'a> {
     pub trace_frame: wgpu::BufferSlice<'a>,
 
     pub map: wgpu::TextureView,
-    pub oct_map: wgpu::TextureView,
     pub mono_bit_map: wgpu::TextureView,
     pub default_sampler: &'a wgpu::Sampler,
     pub mono_bit_map_mipmaps: Vec<wgpu::TextureView>,
@@ -30,9 +29,6 @@ impl<'a> ResourceViews<'a> {
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             depth:
                 resources.render_textures.depth
-                .create_view(&wgpu::TextureViewDescriptor::default()),
-            oct_map:
-                resources.oct_map_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             map:
                 resources.map_texture

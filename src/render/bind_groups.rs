@@ -54,11 +54,17 @@ fn create_primary_binds<'a>(device: &wgpu::Device, views: &'a super::resource_vi
                     wgpu::BindingResource::TextureView(
                         &views.color,
                     ),
-                    wgpu::BindingResource::Buffer(
-                        views.trace_frame
+                    wgpu::BindingResource::Sampler(
+                        &views.default_sampler,
                     ),
                     wgpu::BindingResource::TextureView(
-                        &views.oct_map,
+                        &views.mono_bit_map,
+                    ),
+                    wgpu::BindingResource::TextureView(
+                        &views.map,
+                    ),
+                    wgpu::BindingResource::Buffer(
+                        views.trace_frame
                     ),
                 ]
             )
