@@ -2,22 +2,52 @@ use wgpu::util::DeviceExt;
 
 pub const MONO_BIT_LEVELS: u32 = 4;
 
-const CHUNKS_WIDTH: u32 = 12;
+const LAYER_WIDTH: u32 = 12;
 
 pub struct Resources {
     pub render_textures: RenderTextures,
     pub map_texture: wgpu::Texture,
     pub mono_bit_map_texture: wgpu::Texture,
+    pub layer_index_map_texture: wgpu::Texture,
     pub buffers: Buffers,
     pub default_sampler: wgpu::Sampler,
 }
+
+// a unique id for a chunk in texture memory
+pub enum ChunkID {
+    PrefabID(u32),
+    PartitionID(u32),
+    LayerID(u32),
+}
+
+pub fn chunk_id_to_chunk_coords(chunk_id: ChunkID) -> [u32 ; 3] {
+    const MAX_PREFAB_IDS: u32 = 32 * 32 * 2;
+    const MAX_LAYER_IDS: u32 = 32 * 2;
+
+    // the curve moves across the 3D array like row major order
+    // except its x-axis then z-axis then y-axis
+    let curve_index = match chunk_id {
+        ChunkID::PrefabID(id) => id,
+        ChunkID::PartitionID(id) => id + MAX_PREFAB_IDS + MAX_LAYER_IDS,
+        ChunkID::LayerID(id) => id + MAX_PREFAB_IDS
+    };
+
+    return [curve_index % 32, curve_index / (32 * 32), (curve_index / 32) % 32];
+}
+
 
 impl Resources {
 
     pub fn map_texture_copy_view_by_index(&self, index: u32)
     -> wgpu::TextureCopyView {
-        let chunk_offset = Resources::coords(index, CHUNKS_WIDTH);
+        let chunk_offset = Resources::coords(index, LAYER_WIDTH);
         self.map_texture_copy_view(chunk_offset)
+    }
+
+    pub fn map_texture_copy_view_chunk_id(&self, chunk_id: ChunkID)
+    -> wgpu::TextureCopyView {
+        let chunk_coords = chunk_id_to_chunk_coords(chunk_id);
+        self.map_texture_copy_view(chunk_coords)
     }
 
     pub fn coords(index: u32, length: u32) 
@@ -42,6 +72,15 @@ impl Resources {
             }
     }
 
+    pub fn layer_index_map_texture_copy_view(&self)
+    -> wgpu::TextureCopyView {
+        wgpu::TextureCopyView {
+            texture: &self.layer_index_map_texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+        }
+    }
+
     pub fn new(device: &wgpu::Device) 
     -> Self {
         let render_textures = 
@@ -50,11 +89,26 @@ impl Resources {
             Buffers::new(&device);
 
         let default_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+
+        let map_texture_extents = 
+            wgpu::Extent3d {
+                width: 32 * LAYER_WIDTH,
+                height: 32 * LAYER_WIDTH,
+                depth: 32 * LAYER_WIDTH,
+            };
+
+        let layer_extents = 
+            wgpu::Extent3d {
+                width: 45,
+                height: 15,
+                depth: 45,
+            };
    
         Self {
             render_textures,
             buffers,
-            map_texture: create_map(&device),
+            map_texture: create_index_map(&device, map_texture_extents),
+            layer_index_map_texture: create_index_map(&device, layer_extents),
             mono_bit_map_texture: create_mono_bit_map(&device),
             default_sampler,
         }
@@ -62,20 +116,15 @@ impl Resources {
     }
 }
 
-pub fn create_map(device: &wgpu::Device) -> wgpu::Texture {
+pub fn create_index_map(device: &wgpu::Device, extent: wgpu::Extent3d) -> wgpu::Texture {
     device.create_texture(
         &wgpu::TextureDescriptor {
             label: None,
-            size: 
-                wgpu::Extent3d {
-                    width: 32 * CHUNKS_WIDTH,
-                    height: 32 * CHUNKS_WIDTH,
-                    depth: 32 * CHUNKS_WIDTH,
-                },
+            size: extent,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::R8Uint,
+            format: wgpu::TextureFormat::R16Uint,
             usage:
                 wgpu::TextureUsage::COPY_DST |
                 wgpu::TextureUsage::STORAGE,
@@ -89,9 +138,9 @@ pub fn create_mono_bit_map(device: &wgpu::Device) -> wgpu::Texture {
             label: None,
             size: 
                 wgpu::Extent3d {
-                    width: 16 * CHUNKS_WIDTH,
-                    height: 16 * CHUNKS_WIDTH,
-                    depth: 16 * CHUNKS_WIDTH,
+                    width: 16 * LAYER_WIDTH,
+                    height: 16 * LAYER_WIDTH,
+                    depth: 16 * LAYER_WIDTH,
                 },
             mip_level_count: MONO_BIT_LEVELS,
             sample_count: 1,
@@ -186,6 +235,7 @@ pub const fn div_ceil(val: u32, divisor: u32)
 pub struct Buffers {
     pub screen_quad: wgpu::Buffer,
     pub trace_frame: wgpu::Buffer,
+    pub chunk_changes: wgpu::Buffer,
 }
 
 impl Buffers {
@@ -214,9 +264,22 @@ impl Buffers {
                 },
             );
 
+        // currently support 6 chunks to be changed in a frame
+        // allow more later
+        let chunk_changes = 
+            device.create_buffer(
+                &wgpu::BufferDescriptor {
+                    label: None,
+                    size: 4 * 6,
+                    mapped_at_creation: false,
+                    usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                },
+            );
+
         Self {
             screen_quad,
             trace_frame,
+            chunk_changes
         }
     }
 }

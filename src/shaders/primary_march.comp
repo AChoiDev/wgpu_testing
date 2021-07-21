@@ -21,6 +21,7 @@ layout(set = 0, binding = 5) uniform Frame {
 layout(set = 0, binding = 0, r32f) uniform image2D depth;
 layout(set = 0, binding = 2) uniform sampler monoBitMapSampler;
 layout(set = 0, binding = 3) uniform utexture3D monoBitMap;
+layout(set = 0, binding = 6, r16ui) uniform uimage3D layer_index_map;
 
 vec2 getUV(ivec2 invoc) {
     vec2 resolution = vec2(renderResolution);
@@ -57,6 +58,10 @@ bool checkVoxel(ivec3 coords, int lod) {
   return extractMonoBitMap(coords >> lod, lod) == 1;
 }
 
+uint checkLayerIndexVoxel(ivec3 coords) {
+  return imageLoad(layer_index_map, coords).r;
+}
+
 float mincomp(vec3 value) {
     return min(min(value.x, value.z), value.y);
 }
@@ -64,6 +69,11 @@ float mincomp(vec3 value) {
 bool insideBox3D(vec3 v, vec3 bottomLeft, vec3 topRight) {
     vec3 s = step(bottomLeft, v) - step(topRight, v);
     return (s.x * s.y * s.z) == 1.0; 
+}
+
+bool insideIntBox3D(ivec3 v, ivec3 bottomLeft, ivec3 topRight) {
+  vec3 s = step(bottomLeft, v) - step(topRight, v);
+  return (s.x * s.y * s.z) == 1.0;
 }
 
 ivec2 getReadLocation(ivec2 invoc) {
@@ -83,31 +93,203 @@ float getInputDepth(ivec2 invoc) {
 }
 
 
-vec3 PlaneMarch(vec3 p0, vec3 d, out bool hit) {
+vec3 PlaneMarch(vec3 p0, vec3 d, ivec3 offset, out bool hit) {
   hit = false;
-  float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy));
-  //float t = 0.0;
   
+  // constants
   vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
   vec3 corner = step(0, d);
 
-  while (t < 40.0) {
-    vec3 p = p0 + d * t;
+  // very mutable
+  // float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy));
+  float t = 0.0;
 
-    if (!insideBox3D(p, vec3(0), vec3(32))) {
+  bvec3 mask;
+  int i = 0;
+
+  vec3 boxMax = vec3(32);
+
+  int level = 3;
+
+  while (i < 100) {
+    vec3 p = p0 + d * t;
+    float width = float(pow(2, level));
+
+    if (!insideBox3D(p, vec3(0), boxMax)) {
       return p;
     }
 
-    if (checkVoxel(ivec3(p), 0)) {
+    bool voxelFound = checkVoxel(ivec3(p) + offset * 32, level);
+
+    if (voxelFound && level == 0) {
       hit = true;
       return p;
     }
+
+    if (!voxelFound){ 
+      vec3 deltas = (corner * width - mod(p, width)) * invDir;
+      mask = lessThanEqual(deltas.xyz, min(deltas.yzx, deltas.zxy));
+      float minDelta = dot(vec3(mask) * deltas, vec3(1.0));
+      t += (minDelta + 0.001);
+    }
     
-    vec3 deltas = (corner - fract(p)) * invDir;
-    t += mincomp(deltas) + 0.001;
+
+    level += int(!voxelFound) * 2 - 1;
+
+    level = clamp(level, 0, 3);
+
+    i++;
   }
 
+  // normal = -sign(d) * vec3(mask);
+
   return vec3(0);
+}
+
+float HPlaneMarch(vec3 pInit, vec3 d, out bool hit) {
+  // p0 = vec3(45, 15, 45) / 2.0 + vec3(0.0, 0.0, 0.0);
+  vec3 p0[3] = vec3[3](vec3(45, 15, 45) / 2.0 + pInit / 32.0, vec3(0.0), vec3(0.0));
+  hit = false;
+  
+  // constants
+  vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
+  vec3 corner = step(0, d);
+
+  // very mutable
+  // float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy));
+  float t[3] = float[3](0.0, 0.0, 0.0);
+  int depth = 0;
+  vec3 boxMax = vec3(45, 15, 45);
+  ivec3 offset[2] = ivec3[2](ivec3(0), ivec3(0));
+
+  bvec3 mask;
+  int i = 0;
+
+  while (i < 200) {
+    i++;
+
+    vec3 p = p0[depth] + d * t[depth];
+
+    if (!insideBox3D(p, vec3(0), boxMax)) {
+      if (depth == 0) {
+        hit = false;
+        return 0.0;
+      }
+
+      t[depth] = 0.0;
+      depth -= 1;
+      boxMax = vec3(45, 15, 45);
+
+      vec3 p = p0[depth] + d * t[depth];
+      vec3 deltas = (corner - fract(p)) * invDir;
+      mask = lessThanEqual(deltas.xyz, min(deltas.yzx, deltas.zxy));
+      float minDelta = dot(vec3(mask) * deltas, vec3(1.0));
+      t[depth] += minDelta + 0.002;
+      continue;
+    }
+
+    if (depth == 0) {
+      int chunkIndex = int(checkLayerIndexVoxel(ivec3(p)));
+
+      if (chunkIndex != 65535) {
+        vec3 chunkPos = fract(p) * 32.0;
+        vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
+        vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.0001;
+
+        p0[depth + 1] = adjustedChunkPos;
+        offset[depth + 1] = ivec3(chunkIndex % 12, (chunkIndex / 12) % 12, chunkIndex / 144);
+        depth += 1;
+        boxMax = vec3(32);
+        continue;
+      }
+
+    } else if (depth >= 1) {
+      if (checkVoxel(ivec3(p) + offset[depth - 1] * 32, 0)) {
+        if (depth == 2 || true) {
+          hit = true;
+          return t[0] * 32.0 + t[1] + t[2] / 32.0;
+        }
+
+        vec3 chunkPos = fract(p) * 32.0;
+        vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
+        vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.0001;
+        p0[depth + 1] = adjustedChunkPos;
+        offset[depth + 1] = ivec3(0);
+        depth += 1;
+      }
+    }
+
+    vec3 deltas = (corner - fract(p)) * invDir;
+    mask = lessThanEqual(deltas.xyz, min(deltas.yzx, deltas.zxy));
+    float minDelta = dot(vec3(mask) * deltas, vec3(1.0));
+    t[depth] += minDelta + 0.002;
+  }
+
+  // normal = -sign(d) * vec3(mask);
+
+  return 0.0;
+}
+
+
+float dda_march(vec3 pos, vec3 dir, out bool hit) {
+
+  hit = false;
+
+  ivec3 layerMapDims = ivec3(45, 15, 45);
+  
+  vec3 shiftedPos = (pos / 32) + vec3(layerMapDims / ivec3(2)) + vec3(0.0, 0.0, -6.0);
+  ivec3 initMapPos = ivec3(floor(shiftedPos));
+  ivec3 mapPos = initMapPos;
+
+
+  vec3 distStep = abs(vec3(length(dir)) / dir);
+
+  ivec3 raySign = ivec3(sign(dir));
+
+  vec3 initDists = (sign(dir) * -fract(shiftedPos) + (sign(dir) * 0.5) + 0.5) * distStep;
+
+  vec3 dists  = vec3(0.0);
+
+  bvec3 mask;
+
+  for (int i = 0; i < 200; i++) {
+    if (mapPos.x < 0 || mapPos.y < 0 || mapPos.z < 0
+      || mapPos.x >= 45 || mapPos.y >= 15 || mapPos.z >= 45) {
+        hit = false;
+        break;
+    }
+
+    int chunkIndex = int(checkLayerIndexVoxel(mapPos));
+    if (chunkIndex != 65535) {
+      float currentDist = min(min(dists.x, dists.y), dists.z);
+      // return (currentDist * 32.0);
+
+      vec3 worldPos = currentDist * 32.0 * dir + shiftedPos * 32.0;
+      vec3 chunkPos = worldPos - vec3(mapPos) * 32.0;
+      vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
+      vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.0001;
+
+      ivec3 offset = ivec3(chunkIndex % 12, (chunkIndex / 12) % 12, chunkIndex / 144);
+
+      bool chunkHit;
+      vec3 endChunkPos = PlaneMarch(adjustedChunkPos, dir, offset, chunkHit);
+      if (chunkHit) {
+        hit = true;
+        return (currentDist * 32.0) + length(endChunkPos - chunkPos);
+      }
+
+    }
+    
+    dists = initDists + vec3(abs(mapPos - initMapPos)) * distStep;
+    mask = lessThanEqual(dists.xyz, min(dists.yzx, dists.zxy));
+    
+    mapPos += ivec3(vec3(mask)) * raySign;
+  }
+  // float dist = min(min(dists.x, dists.y), dists.z);
+  // vec3 hitPos = dist * dir + shiftedPos;
+
+  return 0.0;
+
 }
 
 
@@ -118,19 +300,22 @@ void main() {
       return;
     }
 
-    //imageStore(depth, invoc, vec4(getInputDepth(invoc)));
-    //return;
-
     bool hit;
-    vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
+    // vec3 normal;
+    // vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
+    float dist = dda_march(pos, getRayDirection(invoc), hit);
+    // float dist = HPlaneMarch(pos, getRayDirection(invoc), hit);
+    // float dist = 1.0;
 
     if (!hit) {
-      imageStore(depth, invoc, vec4(20.0));
+      imageStore(depth, invoc, vec4(99999.99));
       return;
     }
 
-    float rayLength = length(endPos - pos);
+    // float rayLength = length(endPos - pos);
+    vec3 color;
+    color = vec3(dist);
 
-    imageStore(depth, invoc, vec4(rayLength));
+    imageStore(depth, invoc, vec4(color, 1.0));
 }
 

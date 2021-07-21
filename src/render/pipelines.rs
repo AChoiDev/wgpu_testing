@@ -45,7 +45,7 @@ impl Pipelines {
                 make_compute_pipeline(
                     wgpu::include_spirv!("../spirv/halve_bit_volume.comp.spv"),
                     &device, 
-                    &[&bind_group_layouts.halve_map]
+                    &[&bind_group_layouts.halve_map, &bind_group_layouts.edit_map]
                 ),
             
         }

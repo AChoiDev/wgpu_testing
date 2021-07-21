@@ -66,6 +66,9 @@ fn create_primary_binds<'a>(device: &wgpu::Device, views: &'a super::resource_vi
                     wgpu::BindingResource::Buffer(
                         views.trace_frame
                     ),
+                    wgpu::BindingResource::TextureView(
+                        &views.layer_index_map
+                    ),
                 ]
             )
         }
@@ -79,7 +82,8 @@ fn edit_mono_bit_map_entries<'a>(views: &'a super::resource_views::ResourceViews
         vec![
             wgpu::BindingResource::TextureView(
                 &views.mono_bit_map,
-            )
+            ),
+            wgpu::BindingResource::Buffer(views.chunk_changes),
         ]
     )
 }

@@ -60,6 +60,11 @@ fn create_primary_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                 dynamic: false,
                 min_binding_size: None,
             },
+            wgpu::BindingType::StorageTexture {
+                dimension: wgpu::TextureViewDimension::D3,
+                format: wgpu::TextureFormat::R16Uint,
+                readonly: false,
+            },
         ];
     
     device.create_bind_group_layout(
@@ -85,6 +90,10 @@ fn edit_map_layout(device: &wgpu::Device)
                 dimension: wgpu::TextureViewDimension::D3,
                 format: wgpu::TextureFormat::R8Uint,
                 readonly: false,
+            },
+            wgpu::BindingType::UniformBuffer {
+                dynamic: false,
+                min_binding_size: None,
             }
         ]
     )

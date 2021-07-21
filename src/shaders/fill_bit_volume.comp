@@ -1,8 +1,25 @@
 #version 460 core
 layout (local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(set = 0, binding = 4, r8ui) uniform uimage3D map;
+layout(set = 0, binding = 4, r16ui) uniform uimage3D map;
 layout(set = 1, binding = 0, r8ui) uniform uimage3D monoBitMap;
+
+layout(set = 1, binding = 1) uniform ChunkChanges {
+    uint chunk_index[6];
+};
+
+ivec3 getLayerOffset(int index) {
+
+    int layerWidth = 12;
+
+    ivec3 layerCoords = ivec3(
+        index % layerWidth,
+        (index / layerWidth) % layerWidth,
+        index / (layerWidth * layerWidth)
+    );
+
+    return layerCoords;
+}
 
 ivec3 posFromIndex(int index) {
     ivec3 positions[8] = ivec3[](
@@ -22,17 +39,19 @@ ivec3 posFromIndex(int index) {
 void main() {
     ivec3 invoc = ivec3(gl_GlobalInvocationID.xyz);
 
+    ivec3 layerOffset = getLayerOffset(int(chunk_index[0]));
+
     uint value = 0;
 
     for (int i = 0; i < 8; i++) {
-        ivec3 mapCoords = invoc * 2 + posFromIndex(i);
+        ivec3 mapCoords = invoc * 2 + posFromIndex(i) + layerOffset * 32;
         // if image position is NOT empty space,
         // set the bit of the byte to true
-        if (imageLoad(map, mapCoords).r != 255) {
+        if (imageLoad(map, mapCoords).r != 65535) {
         //if (mapCoords.x % 2 == 0 && mapCoords.x < 16) {
             value = value | (1 << i);
         }
     }
 
-    imageStore(monoBitMap, invoc, uvec4(value));
+    imageStore(monoBitMap, invoc + layerOffset * 16, uvec4(value));
 }

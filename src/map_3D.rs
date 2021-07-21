@@ -60,14 +60,14 @@ impl<T: Clone + Default + Copy> Map3D<T> {
 
 
 use nalgebra as na;
-impl super::displaced_chunks::ChunkData for Map3D<u8> {
+impl super::displaced_chunks::ChunkData for Map3D<u16> {
     fn allocate() -> Self {
         Map3D::new(32)
     }
 
     fn initialize(&mut self, world_chunk_coords: na::Vector3<i32>) {
         self.set_all(
-            &(|coords| super::fill_voxel(coords, 0))
+            &(|coords| super::fill_voxel(coords, world_chunk_coords))
         );
     }
 }

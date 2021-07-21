@@ -106,23 +106,30 @@ impl RenderContext {
                 }
             );
 
+        // write each map texture chunk that needs to be uploaded
         render_desc.map_data
         .iter()
         .for_each(|m|
-            self.queue.write_texture(
-                self.resources.map_texture_copy_view_by_index(m.0 as u32),
-                m.1.full_slice(),
-                wgpu::TextureDataLayout {
-                    offset: 0,
-                    bytes_per_row: 32,
-                    rows_per_image: 32,
-                },
-                wgpu::Extent3d {
-                    width: 32,
-                    height: 32,
-                    depth: 32,
-                }
-            )
+            self.upload_index_map(m.0 as u32, m.1)
+        );
+
+        assert!(render_desc.map_data.len() < 2);
+
+
+        // write layer index map
+        self.queue.write_texture(
+            self.resources.layer_index_map_texture_copy_view(),
+            unsafe {render_desc.layer_index_data[..].align_to().1},
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: 45 * 2,
+                rows_per_image: 15,
+            },
+            wgpu::Extent3d {
+                width: 45,
+                height: 15,
+                depth: 45,
+            }
         );
 
 
@@ -134,13 +141,16 @@ impl RenderContext {
             self.queue.write_buffer(&self.resources.buffers.trace_frame, 0, &data);
         }
 
-        self.construct_bit_volume(&mut encoder, render_desc.frame);
+        if render_desc.map_data.len() > 0 {
+            self.construct_bit_volume(&mut encoder, render_desc.map_data[0].0 as u32);
+        }
+
 
         use super::resources::div_ceil;
 
         let res_dispatch = [div_ceil(crate::RENDER_RES_X, 8), div_ceil(crate::RENDER_RES_Y, 8)];
 
-        self.cone_trace(&mut encoder);
+        // self.cone_trace(&mut encoder);
 
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -176,7 +186,30 @@ impl RenderContext {
 
     }
 
-    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, frame: u32) {
+    fn upload_index_map(&self, displaced_partition_id: u32, map: &Map3D<u16>) {
+        self.queue.write_texture(
+            self.resources.map_texture_copy_view_by_index(displaced_partition_id),
+            unsafe {map.full_slice().align_to().1},
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: 32 * 2,
+                rows_per_image: 32,
+            },
+            wgpu::Extent3d {
+                width: 32,
+                height: 32,
+                depth: 32,
+            }
+        )
+    }
+
+    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, chunk_index: u32) {
+        // println!("{}", chunk_index);
+        self.queue.write_buffer(
+            &self.resources.buffers.chunk_changes,
+            0,
+            unsafe {[chunk_index].align_to().1}
+        );
         // Fill bit volume from initial uploaded map
         {
             let mut cpass = encoder.begin_compute_pass();
@@ -195,6 +228,7 @@ impl RenderContext {
             let mut cpass = encoder.begin_compute_pass();
             cpass.set_pipeline(&self.pipelines.halve_bit_volume);
             cpass.set_bind_group(0, &self.bind_groups.halve_map_binds[i], &[]);
+            cpass.set_bind_group(1, &self.bind_groups.edit_mono_bit_map_texture, &[]);
             cpass.dispatch(d, d, d);
         });
     }
@@ -250,7 +284,8 @@ fn swapchain_only_color_attachments(
 
 pub struct RenderDescriptor<'a> {
     pub window: &'a winit::window::Window,
-    pub map_data: Vec<(usize, &'a Map3D<u8>)>,
+    pub map_data: Vec<(usize, &'a Map3D<u16>)>,
+    pub layer_index_data: Vec<u16>,
     pub cam_orientation: na::UnitQuaternion<f32>,
     pub pos: na::Vector3<f32>,
     pub delta_time: f32,

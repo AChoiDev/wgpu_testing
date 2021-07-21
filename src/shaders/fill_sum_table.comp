@@ -9,6 +9,7 @@ void main() {
     ivec3 invoc = ivec3(gl_GlobalInvocationID.xyz);
 
     uint value = 0;
+    // NOTE: this code has not been changed to use u16 values
     if (imageLoad(map, invoc).r != 255) {
         value = 1;
     }
