@@ -67,7 +67,7 @@ fn create_primary_binds<'a>(device: &wgpu::Device, views: &'a super::resource_vi
                         views.trace_frame
                     ),
                     wgpu::BindingResource::TextureView(
-                        &views.layer_index_map
+                        &views.palette_array
                     ),
                 ]
             )

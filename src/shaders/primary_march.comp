@@ -2,7 +2,6 @@
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 //p1 => padding1
-//TODO: Rename this to frame
 layout(set = 0, binding = 5) uniform Frame {
     vec3 pos;
       int p0;
@@ -19,23 +18,21 @@ layout(set = 0, binding = 5) uniform Frame {
 };
 
 layout(set = 0, binding = 0, r32f) uniform image2D depth;
+layout(set = 0, binding = 1, r11f_g11f_b10f) uniform writeonly image2D outputColor;
 layout(set = 0, binding = 2) uniform sampler monoBitMapSampler;
 layout(set = 0, binding = 3) uniform utexture3D monoBitMap;
-layout(set = 0, binding = 6, r16ui) uniform uimage3D layer_index_map;
-
-vec2 getUV(ivec2 invoc) {
-    vec2 resolution = vec2(renderResolution);
-    float ratio = resolution.x / resolution.y;
-
-    vec2 pixelCoords =  vec2(invoc) + vec2(0.5);
-    
-    return (2.0 / resolution.y) * pixelCoords - vec2(ratio, 1.0);
-}
+layout(set = 0, binding = 4, r16ui) uniform uimage3D megaIndexMap;
+layout(set = 0, binding = 6) uniform texture2D paletteArray;
 
 vec3 getRayDirection(ivec2 invoc) {
-    vec3 baseDir = normalize(vec3(getUV(invoc), cotanHalfFov));
+  vec2 resolution = vec2(renderResolution);
+  float ratio = resolution.x / resolution.y;
+  vec2 pixelCoords =  vec2(invoc) + vec2(0.5);
+  vec2 uv = (2.0 / resolution.y) * pixelCoords - vec2(ratio, 1.0);
 
-    return baseDir.x * right + baseDir.y * up + baseDir.z * forward;
+  vec3 baseDir = normalize(vec3(uv, cotanHalfFov));
+
+  return baseDir.x * right + -baseDir.y * up + baseDir.z * forward;
 }
 
 int getBitIndex(ivec3 coords) {
@@ -59,21 +56,12 @@ bool checkVoxel(ivec3 coords, int lod) {
 }
 
 uint checkLayerIndexVoxel(ivec3 coords) {
-  return imageLoad(layer_index_map, coords).r;
-}
-
-float mincomp(vec3 value) {
-    return min(min(value.x, value.z), value.y);
+  return imageLoad(megaIndexMap, coords + ivec3(0, 32 * 2, 0)).r;
 }
 
 bool insideBox3D(vec3 v, vec3 bottomLeft, vec3 topRight) {
     vec3 s = step(bottomLeft, v) - step(topRight, v);
     return (s.x * s.y * s.z) == 1.0; 
-}
-
-bool insideIntBox3D(ivec3 v, ivec3 bottomLeft, ivec3 topRight) {
-  vec3 s = step(bottomLeft, v) - step(topRight, v);
-  return (s.x * s.y * s.z) == 1.0;
 }
 
 ivec2 getReadLocation(ivec2 invoc) {
@@ -92,190 +80,123 @@ float getInputDepth(ivec2 invoc) {
   return imageLoad(depth, getReadLocation(invoc)).r;
 }
 
+struct MarchResult {
+  bool hit;
+  vec3 normal;
+  ivec3 cubeCoords;
+};
 
-vec3 PlaneMarch(vec3 p0, vec3 d, ivec3 offset, out bool hit) {
-  hit = false;
-  
-  // constants
-  vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
-  vec3 corner = step(0, d);
+struct DirContext {
+  vec3 dir;
+  vec3 invDir;
+  vec3 corner; // step(0, dir)
+};
 
-  // very mutable
-  // float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy));
-  float t = 0.0;
-
-  bvec3 mask;
-  int i = 0;
-
-  vec3 boxMax = vec3(32);
-
-  int level = 3;
-
-  while (i < 100) {
-    vec3 p = p0 + d * t;
-    float width = float(pow(2, level));
-
-    if (!insideBox3D(p, vec3(0), boxMax)) {
-      return p;
-    }
-
-    bool voxelFound = checkVoxel(ivec3(p) + offset * 32, level);
-
-    if (voxelFound && level == 0) {
-      hit = true;
-      return p;
-    }
-
-    if (!voxelFound){ 
-      vec3 deltas = (corner * width - mod(p, width)) * invDir;
-      mask = lessThanEqual(deltas.xyz, min(deltas.yzx, deltas.zxy));
-      float minDelta = dot(vec3(mask) * deltas, vec3(1.0));
-      t += (minDelta + 0.001);
-    }
-    
-
-    level += int(!voxelFound) * 2 - 1;
-
-    level = clamp(level, 0, 3);
-
-    i++;
-  }
-
-  // normal = -sign(d) * vec3(mask);
-
-  return vec3(0);
+MarchResult getInvalidMarchResult() {
+  return MarchResult (false, vec3(0.0), ivec3(0));
 }
 
-float HPlaneMarch(vec3 pInit, vec3 d, out bool hit) {
-  // p0 = vec3(45, 15, 45) / 2.0 + vec3(0.0, 0.0, 0.0);
-  vec3 p0[3] = vec3[3](vec3(45, 15, 45) / 2.0 + pInit / 32.0, vec3(0.0), vec3(0.0));
-  hit = false;
-  
-  // constants
-  vec3 invDir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
-  vec3 corner = step(0, d);
 
-  // very mutable
-  // float t = getInputDepth(ivec2(gl_GlobalInvocationID.xy));
-  float t[3] = float[3](0.0, 0.0, 0.0);
-  int depth = 0;
-  vec3 boxMax = vec3(45, 15, 45);
-  ivec3 offset[2] = ivec3[2](ivec3(0), ivec3(0));
-
-  bvec3 mask;
-  int i = 0;
-
-  while (i < 200) {
-    i++;
-
-    vec3 p = p0[depth] + d * t[depth];
-
-    if (!insideBox3D(p, vec3(0), boxMax)) {
-      if (depth == 0) {
-        hit = false;
-        return 0.0;
-      }
-
-      t[depth] = 0.0;
-      depth -= 1;
-      boxMax = vec3(45, 15, 45);
-
-      vec3 p = p0[depth] + d * t[depth];
-      vec3 deltas = (corner - fract(p)) * invDir;
-      mask = lessThanEqual(deltas.xyz, min(deltas.yzx, deltas.zxy));
-      float minDelta = dot(vec3(mask) * deltas, vec3(1.0));
-      t[depth] += minDelta + 0.002;
-      continue;
-    }
-
-    if (depth == 0) {
-      int chunkIndex = int(checkLayerIndexVoxel(ivec3(p)));
-
-      if (chunkIndex != 65535) {
-        vec3 chunkPos = fract(p) * 32.0;
-        vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
-        vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.0001;
-
-        p0[depth + 1] = adjustedChunkPos;
-        offset[depth + 1] = ivec3(chunkIndex % 12, (chunkIndex / 12) % 12, chunkIndex / 144);
-        depth += 1;
-        boxMax = vec3(32);
-        continue;
-      }
-
-    } else if (depth >= 1) {
-      if (checkVoxel(ivec3(p) + offset[depth - 1] * 32, 0)) {
-        if (depth == 2 || true) {
-          hit = true;
-          return t[0] * 32.0 + t[1] + t[2] / 32.0;
-        }
-
-        vec3 chunkPos = fract(p) * 32.0;
-        vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
-        vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.0001;
-        p0[depth + 1] = adjustedChunkPos;
-        offset[depth + 1] = ivec3(0);
-        depth += 1;
-      }
-    }
-
-    vec3 deltas = (corner - fract(p)) * invDir;
+// returns whether the new position is in the box
+bool performMarch(bool voxelFound, ivec3 chunkOffset, inout int mip_level, 
+  DirContext dirContext, inout vec3 pos, inout bvec3 mask) {
+  // mutates mask and position
+  if (!voxelFound){ 
+    float width = float(pow(2, mip_level));
+    vec3 deltas = (dirContext.corner * width - mod(pos, width)) * dirContext.invDir;
     mask = lessThanEqual(deltas.xyz, min(deltas.yzx, deltas.zxy));
     float minDelta = dot(vec3(mask) * deltas, vec3(1.0));
-    t[depth] += minDelta + 0.002;
+    pos += (minDelta + 0.001) * dirContext.dir;
   }
 
-  // normal = -sign(d) * vec3(mask);
+  mip_level += int(!voxelFound) * 2 - 1;
+  mip_level = clamp(mip_level, 0, 3);
 
-  return 0.0;
+  return insideBox3D(pos, vec3(0), vec3(32));
+}
+
+MarchResult PlaneMarch(vec3 p0, ivec3 offset, inout bvec3 mask, DirContext dirContext) {
+
+  int mip_level = 3;
+
+  // first loop is in the partition
+  // second loop is in the prefab
+  vec3 p = p0;
+  bool isInBoxOne = true;
+  for (int i = 0; i < 200 && isInBoxOne; i++) {
+    bool voxelFound = checkVoxel(ivec3(p) + offset * 32, mip_level);
+
+    if (voxelFound && mip_level == 0) {
+      int chunkIndex = int(imageLoad(megaIndexMap, ivec3(p) + offset * 32));
+      vec3 chunkPos = fract(p) * 32.0;
+      vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
+      ivec3 offsetTwo = ivec3(chunkIndex % 32, chunkIndex / (1024), (chunkIndex / 32) % 32);
+      vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.00001;
+
+      mip_level = 3;
+      {
+        vec3 pTwo = adjustedChunkPos;
+        bool isInBoxTwo = true;
+        for (int j = 0; j < 100 && isInBoxTwo; j++) {
+          bool voxelFoundTwo = checkVoxel(ivec3(pTwo) + offsetTwo * 32, mip_level);
+
+          if (voxelFoundTwo && mip_level == 0) {
+            vec3 normal = -sign(dirContext.dir) * vec3(mask);
+            return MarchResult (true, normal, ivec3(pTwo) + ivec3(p) * 32);
+          }
+
+          isInBoxTwo = performMarch(voxelFoundTwo, offsetTwo, mip_level,
+            dirContext, pTwo, mask);
+        }
+      }
+      mip_level = 0;
+      voxelFound = false;
+    }
+
+    isInBoxOne = performMarch(voxelFound, offset, mip_level, dirContext, p, mask);
+  }
+
+  return getInvalidMarchResult();
 }
 
 
-float dda_march(vec3 pos, vec3 dir, out bool hit) {
 
-  hit = false;
-
-  ivec3 layerMapDims = ivec3(45, 15, 45);
-  
-  vec3 shiftedPos = (pos / 32) + vec3(layerMapDims / ivec3(2)) + vec3(0.0, 0.0, -6.0);
-  ivec3 initMapPos = ivec3(floor(shiftedPos));
+MarchResult dda_march(vec3 dir, vec3 posInPartition, ivec3 displacementCoords) {
+  ivec3 initMapPos = displacementCoords;
   ivec3 mapPos = initMapPos;
-
 
   vec3 distStep = abs(vec3(length(dir)) / dir);
 
   ivec3 raySign = ivec3(sign(dir));
 
-  vec3 initDists = (sign(dir) * -fract(shiftedPos) + (sign(dir) * 0.5) + 0.5) * distStep;
+  vec3 initDists = (sign(dir) * -(posInPartition / 32.0) + (sign(dir) * 0.5) + 0.5) * distStep;
 
-  vec3 dists  = vec3(0.0);
+  vec3 dists = vec3(0.0);
 
   bvec3 mask;
 
+  DirContext dirContext = DirContext(dir, vec3(1.0) / dir, step(0, dir));
+
   for (int i = 0; i < 200; i++) {
-    if (mapPos.x < 0 || mapPos.y < 0 || mapPos.z < 0
-      || mapPos.x >= 45 || mapPos.y >= 15 || mapPos.z >= 45) {
-        hit = false;
+    if (mapPos.x < -21 || mapPos.y < -7 || mapPos.z < -21
+      || mapPos.x > 21 || mapPos.y > 7 || mapPos.z > 21) {
         break;
     }
 
-    int chunkIndex = int(checkLayerIndexVoxel(mapPos));
+
+    int chunkIndex = int(imageLoad(megaIndexMap, mapPos + (ivec3(45, 15, 45) / 2) + ivec3(0, 32 * 2, 0)).r);
     if (chunkIndex != 65535) {
       float currentDist = min(min(dists.x, dists.y), dists.z);
-      // return (currentDist * 32.0);
 
-      vec3 worldPos = currentDist * 32.0 * dir + shiftedPos * 32.0;
-      vec3 chunkPos = worldPos - vec3(mapPos) * 32.0;
+      vec3 chunkPos = posInPartition + 32.0 * (vec3(displacementCoords - mapPos) + currentDist * dir);
       vec3 towardsChunkMiddle = normalize(vec3(16.0) - chunkPos);
-      vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.0001;
 
-      ivec3 offset = ivec3(chunkIndex % 12, (chunkIndex / 12) % 12, chunkIndex / 144);
+      vec3 adjustedChunkPos = chunkPos + towardsChunkMiddle * 0.00001;
+      ivec3 offset = ivec3(chunkIndex % 32, chunkIndex / (1024), (chunkIndex / 32) % 32);
 
-      bool chunkHit;
-      vec3 endChunkPos = PlaneMarch(adjustedChunkPos, dir, offset, chunkHit);
-      if (chunkHit) {
-        hit = true;
-        return (currentDist * 32.0) + length(endChunkPos - chunkPos);
+      MarchResult result = PlaneMarch(adjustedChunkPos, offset, mask, dirContext);
+      if (result.hit) {
+        return MarchResult (true, result.normal, result.cubeCoords + 32 * 32 * mapPos);
       }
 
     }
@@ -285,13 +206,105 @@ float dda_march(vec3 pos, vec3 dir, out bool hit) {
     
     mapPos += ivec3(vec3(mask)) * raySign;
   }
-  // float dist = min(min(dists.x, dists.y), dists.z);
-  // vec3 hitPos = dist * dir + shiftedPos;
 
-  return 0.0;
+  return getInvalidMarchResult();
 
 }
 
+ivec3 getChunkCoords(int chunkIndex) {
+  return ivec3(chunkIndex % 32, chunkIndex / (1024), (chunkIndex / 32) % 32);
+}
+
+vec3 getPaletteColor(int paletteEntry, int prefabID) {
+  return texelFetch(sampler2D(paletteArray, monoBitMapSampler), ivec2(paletteEntry, prefabID), 0).rgb;
+}
+vec3 getCubeColor(ivec3 globalCubeCoords) {
+  ivec3 displacementDims = ivec3(45, 15, 45);
+
+  ivec3 normalizedGlobalCubeCoords = globalCubeCoords + (displacementDims / 2) * 32 * 32;
+  ivec3 partitionCoords = normalizedGlobalCubeCoords / (32 * 32);
+  ivec3 cubeCoordsInPartition = normalizedGlobalCubeCoords - (partitionCoords * 32 * 32);
+  ivec3 prefabCoords = cubeCoordsInPartition / 32;
+  ivec3 cubeCoords = cubeCoordsInPartition - (prefabCoords * 32);
+
+  int chunkIndexOne = int(imageLoad(megaIndexMap, partitionCoords + ivec3(0, 2, 0) * 32));
+  ivec3 offsetOne = getChunkCoords(chunkIndexOne);
+
+  int chunkIndexTwo = int(imageLoad(megaIndexMap, prefabCoords + offsetOne * 32));
+  ivec3 offsetTwo = getChunkCoords(chunkIndexTwo);
+
+  int chunkIndexThree = int(imageLoad(megaIndexMap, cubeCoords + offsetTwo * 32));
+
+  return getPaletteColor(chunkIndexThree, chunkIndexTwo);
+}
+
+float checkCube(ivec3 globalCubeCoords) {
+  ivec3 displacementDims = ivec3(45, 15, 45);
+
+  ivec3 normalizedGlobalCubeCoords = globalCubeCoords + (displacementDims / 2) * 32 * 32;
+  ivec3 partitionCoords = normalizedGlobalCubeCoords / (32 * 32);
+
+  if (partitionCoords.x < 0 || partitionCoords.y < 0 || partitionCoords.z < 0
+      || partitionCoords.x >= 45 || partitionCoords.y >= 15 || partitionCoords.z >= 45) {
+    return 0.0;
+  }
+
+  ivec3 cubeCoordsInPartition = normalizedGlobalCubeCoords - (partitionCoords * 32 * 32);
+  ivec3 prefabCoords = cubeCoordsInPartition / 32;
+  ivec3 cubeCoords = cubeCoordsInPartition - (prefabCoords * 32);
+
+  int chunkIndexOne = int(imageLoad(megaIndexMap, partitionCoords + ivec3(0, 2, 0) * 32));
+  if (chunkIndexOne == 65535) {
+    return 0.0;
+  }
+  ivec3 offsetOne = getChunkCoords(chunkIndexOne);
+
+  int chunkIndexTwo = int(imageLoad(megaIndexMap, prefabCoords + offsetOne * 32));
+  if (chunkIndexTwo == 65535) {
+    return 0.0;
+  }
+  ivec3 offsetTwo = getChunkCoords(chunkIndexTwo);
+
+  int chunkIndexThree = int(imageLoad(megaIndexMap, cubeCoords + offsetTwo * 32));
+  if (chunkIndexThree == 65535) {
+    return 0.0;
+  }
+
+  return 1.0;
+}
+
+
+float sum(vec3 v) { return dot(v, vec3(1.0)); }
+float vertexAo(vec2 side, float corner) {
+	return (side.x + side.y + max(corner, side.x * side.y)) / 3.0;
+}
+
+vec4 voxelAo(ivec3 pos, ivec3 d1, ivec3 d2) {
+	vec4 side = vec4(checkCube(pos + d1), checkCube(pos + d2), checkCube(pos - d1), checkCube(pos - d2));
+	vec4 corner = vec4(checkCube(pos + d1 + d2), checkCube(pos - d1 + d2), checkCube(pos - d1 - d2), checkCube(pos + d1 - d2));
+	vec4 ao;
+	ao.x = vertexAo(side.xy, corner.x);
+	ao.y = vertexAo(side.yz, corner.y);
+	ao.z = vertexAo(side.zw, corner.z);
+	ao.w = vertexAo(side.wx, corner.w);
+	return 1.0 - ao;
+}
+
+// return depth
+float getCubePosIntersect(vec3 posInPartition, ivec3 displacementCoords, 
+  vec3 dir, vec3 normal, ivec3 cubeCoords) {
+  vec3 globalPos = posInPartition * 32.0 + vec3(displacementCoords) * 32.0 * 32.0;
+
+  vec3 deltas = (step(vec3(0.0), normal) + vec3(cubeCoords)) - globalPos;
+
+  if (normal.x != 0.0) {
+    return abs(deltas.x / dir.x);
+  } else if (normal.y != 0.0) {
+    return abs(deltas.y / dir.y);
+  } else {
+    return abs(deltas.z / dir.z);
+  }
+}
 
 void main() {
     ivec2 invoc = ivec2(gl_GlobalInvocationID.xy);
@@ -300,22 +313,72 @@ void main() {
       return;
     }
 
-    bool hit;
-    // vec3 normal;
-    // vec3 endPos = PlaneMarch(pos, getRayDirection(invoc), hit);
-    float dist = dda_march(pos, getRayDirection(invoc), hit);
-    // float dist = HPlaneMarch(pos, getRayDirection(invoc), hit);
-    // float dist = 1.0;
+    vec3 primaryDir = getRayDirection(invoc);
 
-    if (!hit) {
+    vec3 primaryPosInPartition = mod(pos, vec3(32.0));
+    ivec3 primaryPartitionCoords = ivec3(floor(pos / 32.0));
+
+    MarchResult result = dda_march(
+      getRayDirection(invoc), 
+      primaryPosInPartition, primaryPartitionCoords);
+
+    float dist = getCubePosIntersect(primaryPosInPartition, primaryPartitionCoords, 
+      getRayDirection(invoc), result.normal, result.cubeCoords);
+
+    vec3 globalPos = primaryPosInPartition * 32.0 
+      + vec3(primaryPartitionCoords) * 32.0 * 32.0;
+
+    vec3 intersectionGlobalPos = (globalPos + primaryDir * dist) / 32.0 + result.normal * 0.001;
+    vec3 secondaryPosInPartition = mod(intersectionGlobalPos, vec3(32.0));
+    ivec3 secondaryPartitionCoords = ivec3(floor(intersectionGlobalPos / 32.0));
+
+    MarchResult shadowResult = dda_march(
+      normalize(vec3(2.0, 1.0, 1.0)),
+      secondaryPosInPartition, secondaryPartitionCoords
+    );
+
+
+    if (!result.hit) {
       imageStore(depth, invoc, vec4(99999.99));
+      imageStore(outputColor, invoc, vec4(0.0));
       return;
     }
 
-    // float rayLength = length(endPos - pos);
-    vec3 color;
-    color = vec3(dist);
 
-    imageStore(depth, invoc, vec4(color, 1.0));
+    // ivec3 mask = ivec3(abs(result.normal));
+    // vec4 ambient = voxelAo(result.cubeCoords + ivec3(result.normal), mask.zxy, mask.yzx);
+    // vec3 erp = intersectionGlobalPos * 32.0;
+    // vec2 cubeUV = mod(vec2(dot(vec3(mask) * erp.yzx, vec3(1.0)), dot(vec3(mask) * erp.zxy, vec3(1.0))), vec2(1.0));
+    // float interAo = mix(mix(ambient.z, ambient.w, cubeUV.x), 
+    //   mix(ambient.y, ambient.x, cubeUV.x), cubeUV.y);
+    float interAo = 1.0;
+    // interAo = pow(interAo, 1.0 / 3.0); 
+
+    // float rayLength = length(endPos - pos);
+    // vec3 color;
+    // color = vec3(dist);
+    vec3 albedo = getCubeColor(result.cubeCoords);
+    // vec3 albedo = vec3(1.0);
+
+    // vec3 posInCube = mod(globalPos + primaryDir * dist, vec3(1.0));
+
+    // imageStore(depth, invoc, vec4(color, 1.0));
+    // imageStore(outputColor, invoc, vec4(1.0 - exp(-0.1 * dist)));
+    // vec3 visualNormal = result.normal * result.normal * (0.5 + 0.15) + result.normal * ((1.0 - 0.15) / 2.0);
+    // imageStore(outputColor, invoc, vec4(visualNormal, 1.0));
+    // imageStore(outputColor, invoc, vec4((fract(fract(result.pos) * 32.0)), 1.0));
+    // float factor = (shadowResult.hit)? 0.1 : 1.0;
+    float factor = 0.1 + interAo * (1.0 - 0.1);
+    if (shadowResult.hit) {
+      factor = min(factor, 0.1);
+    }
+    // factor = clamp(factor, 0.0, 1.0);
+    // float factor = 1.0;
+    // vec3 posVisual = posInCube + result.normal * 0.01;
+    // imageStore(outputColor, invoc, vec4(posVisual, 1.0));
+    // imageStore(outputColor, invoc, vec4(mod(intersectionGlobalPos * 32.0, vec3(1.0)), 1.0));
+    // imageStore(outputColor, invoc, vec4(cubeUV, 1.0, 1.0));
+    imageStore(outputColor, invoc, vec4(factor * albedo, 1.0));
+    // imageStore(outputColor, invoc, vec4(getCubeColor(result.cubeCoords), 1.0));
 }
 

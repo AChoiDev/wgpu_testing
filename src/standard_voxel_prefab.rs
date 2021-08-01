@@ -1,13 +1,16 @@
+use std::u16;
+
+use crate::map_3D::Map3D;
+
 use super::bit_voxels::BitVoxels;
 use super::dot_vox_wrapper::DotVoxWrapper;
-use nalgebra as na;
 
 pub struct StandardVoxelPrefab
 {
     dims : [usize ; 3],
     bit_voxels : BitVoxels,
-    palette_volume : Vec<u8>,
-    palette : [u32 ; 256]
+    pub palette_volume : Map3D<u16>,
+    pub palette : [u32 ; 256]
 }
 
 
@@ -29,14 +32,11 @@ impl StandardVoxelPrefab
 
         let palette_volume = 
         {
-            let mut pal_vol = vec![0 ; dims[0] * dims[1] * dims[2]];
+            let mut pal_vol = Map3D::new_with_default(32, u16::MAX);
             for voxel in vox_data_wrap.voxel_slice(0)
             {
-                let index = 
-                    voxel.x as usize 
-                    + voxel.y as usize * dims[0] 
-                    + voxel.z as usize * dims[0] * dims[1];
-                pal_vol[index] = voxel.i;
+                pal_vol.set([voxel.x as usize, voxel.y as usize, voxel.z as usize], (voxel.i) as u16);
+                // pal_vol[index] = voxel.i as u16;
             }
             pal_vol
         };

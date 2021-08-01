@@ -1,8 +1,8 @@
-const VIEW_HEIGHT: usize = 4;
-const VIEW_DEPTH: usize = 9;
+const VIEW_HEIGHT: usize = 5;
+const VIEW_DEPTH: usize = 15;
 
 pub fn radius_displacement_set()
-        -> IndexSet<na::Vector3<i32>>
+        -> HashSet<na::Vector3<i32>>
 {
     let mut displacement_set = HashSet::new();
 
@@ -26,7 +26,7 @@ pub fn radius_displacement_set()
 
     println!("possible displacement total: {}", displacement_set.len());
 
-    displacement_set.into_iter().collect()
+    displacement_set
 }
 
 
@@ -42,10 +42,11 @@ fn displacement_valid(displacement : na::Vector3<i32>)
     ratios.iter().fold(0f32, |acc, r| acc + r * r) <= 1f32
 }
 
-use std::{collections::HashSet};
-use indexmap::IndexSet;
+use std::collections::HashSet;
 
 use nalgebra as na;
+
+use crate::render::resources::ChunkIDVariant;
 
 type VectorInt = na::Vector3<i32>;
 
@@ -64,7 +65,7 @@ pub struct DisplacedChunks<T : ChunkData>
 
     // The set of all possible partition displacements from view_partition_coords
     // this is constant
-    displacement_set : IndexSet<VectorInt>,
+    displacement_set : HashSet<VectorInt>,
     
     
 }
@@ -147,17 +148,19 @@ impl<T: ChunkData>  DisplacedChunks<T> {
         .map(|(i, m)| (i, &m.data))
         .collect()
     }
+
     pub fn len(&self)
         -> usize
     {
         self.chunks.len()
     }
 
+    // set field and update chunk partition coords
     pub fn set_view_partition_coords(&mut self, coords: VectorInt) {
         self.view_partition_coords = coords;
 
         let mut invalid_partition_ids: Vec<usize> = Vec::new();
-        let mut filled_displacements: IndexSet<VectorInt> = IndexSet::new();
+        let mut filled_displacements: HashSet<VectorInt> = HashSet::new();
 
         // loop through chunks to extract information and uninitialize chunks
         for (partition_id, chunk) in self.chunks.iter_mut().enumerate() {
@@ -180,8 +183,6 @@ impl<T: ChunkData>  DisplacedChunks<T> {
     }
 
     pub fn get_index_map(&self) -> Vec<u16> {
-        // let start_instant = std::time::Instant::now();
-
         let map_dims = DISPLACEMENT_MAP_DIMS;
         assert!(map_dims[0] % 2 == 1 && map_dims[1] % 2 == 1 && map_dims[2] % 2 == 1);
         let volume = map_dims[0] * map_dims[1] * map_dims[2];
@@ -199,7 +200,7 @@ impl<T: ChunkData>  DisplacedChunks<T> {
             }
 
             let map_vec_index = (map_coords.x + (map_coords.y * map_dims[0] as i32) + (map_coords.z * map_dims[0] as i32 * map_dims[1] as i32)) as usize;
-            map_vec[map_vec_index] = i as u16;
+            map_vec[map_vec_index] = (super::render::resources::chunk_id_variant_to_id(ChunkIDVariant::PartitionID(i as u32))) as u16;
         }
         
         // println!("index map created in {} ms", start_instant.elapsed().as_secs_f32() * 1000.);

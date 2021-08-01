@@ -4,23 +4,36 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, r32f) uniform readonly image2D depthInput;
 layout(set = 0, binding = 1, r11f_g11f_b10f) uniform writeonly image2D outputColor;
-layout(set = 0, binding = 6, r16ui) uniform uimage3D indexMap;
+layout(set = 0, binding = 2) uniform sampler defaultSampler;
+layout(set = 0, binding = 4, r16ui) uniform uimage3D map;
+layout(set = 0, binding = 6) uniform texture2D paletteArray;
 
 void main() {
     ivec2 pixel_pos = ivec2(gl_GlobalInvocationID.xy);
 
     float rayLength = imageLoad(depthInput, pixel_pos).r;
 
-    imageStore(outputColor, pixel_pos, vec4(exp(rayLength * 0.2 * -0.189)));
+    // imageStore(outputColor, pixel_pos, vec4(1.0 - exp(rayLength * 0.009 * -0.189)));
     // if (rayLength > 0) {
     //     imageStore(outputColor, pixel_pos, vec4(0.0));
     // } else {
     //     imageStore(outputColor, pixel_pos, vec4(1.0));
     // }
+    // if (pixel_pos.y == 150 && pixel_pos.x < 256) {
+        // ivec2 loadCoords = ivec2(pixel_pos.x, 0);
+        // vec3 result = texelFetch(sampler2D(paletteArray, defaultSampler), loadCoords, 0).xyz;
+        // imageStore(outputColor, pixel_pos, vec4(result, 1.0));
+    // }
+
+    // if (pixel_pos.y > 150 && pixel_pos.y < 200 && pixel_pos.x > 50 && pixel_pos.x < 100) {
+    //     ivec2 loadCoords = ivec2(137, 0);
+    //     vec3 result = texelFetch(sampler2D(paletteArray, defaultSampler), loadCoords, 0).xyz;
+    //     imageStore(outputColor, pixel_pos, vec4(result, 1.0));
+    // }
 
     if (pixel_pos.x < 45 * 15 && pixel_pos.y < 45) {
         ivec3 loadCoords = ivec3(pixel_pos.x % 45, pixel_pos.x / 45, pixel_pos.y % 45);
-        uint index = imageLoad(indexMap, loadCoords).r;
+        uint index = imageLoad(map, loadCoords + ivec3(0, 32 * 2, 0)).r;
         // float color = (float(index) * 0.01) + 0.01;
         vec3 color;
         uint modIndex = index % 3;

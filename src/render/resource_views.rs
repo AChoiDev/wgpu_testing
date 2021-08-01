@@ -8,7 +8,7 @@ pub struct ResourceViews<'a> {
     pub mono_bit_map: wgpu::TextureView,
     pub default_sampler: &'a wgpu::Sampler,
     pub mono_bit_map_mipmaps: Vec<wgpu::TextureView>,
-    pub layer_index_map: wgpu::TextureView,
+    pub palette_array: wgpu::TextureView,
 }
 
 impl<'a> ResourceViews<'a> {
@@ -46,8 +46,8 @@ impl<'a> ResourceViews<'a> {
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             default_sampler:
                 &resources.default_sampler,
-            layer_index_map:
-                resources.layer_index_map_texture
+            palette_array:
+                resources.palette_array
                 .create_view(&wgpu::TextureViewDescriptor::default()),
         }
     }

@@ -5,21 +5,8 @@ layout(set = 0, binding = 4, r16ui) uniform uimage3D map;
 layout(set = 1, binding = 0, r8ui) uniform uimage3D monoBitMap;
 
 layout(set = 1, binding = 1) uniform ChunkChanges {
-    uint chunk_index[6];
+    uvec3 chunk_coords[2];
 };
-
-ivec3 getLayerOffset(int index) {
-
-    int layerWidth = 12;
-
-    ivec3 layerCoords = ivec3(
-        index % layerWidth,
-        (index / layerWidth) % layerWidth,
-        index / (layerWidth * layerWidth)
-    );
-
-    return layerCoords;
-}
 
 ivec3 posFromIndex(int index) {
     ivec3 positions[8] = ivec3[](
@@ -39,7 +26,7 @@ ivec3 posFromIndex(int index) {
 void main() {
     ivec3 invoc = ivec3(gl_GlobalInvocationID.xyz);
 
-    ivec3 layerOffset = getLayerOffset(int(chunk_index[0]));
+    ivec3 layerOffset = ivec3(chunk_coords[0]);
 
     uint value = 0;
 

@@ -19,6 +19,7 @@ imgui-wgpu = "0.12.0"
 imgui = "0.6.1"
 imgui-winit-support = "0.6.1"
 dot_vox = "4.1.0"
+noise = "0.7"
 
 [build-dependencies]
 shaderc = "0.7.0"

@@ -18,6 +18,14 @@ impl<T: Clone + Default + Copy> Map3D<T> {
         }
     }
 
+    pub fn new_with_default(length: usize, default_val: T) 
+    -> Self {
+        Self {
+            data: vec![default_val ; length.pow(3)],
+            length
+        }
+    }
+
     pub fn index(&self, coords: [usize ; 3]) 
     -> usize {
         coords[0] + 
@@ -59,6 +67,9 @@ impl<T: Clone + Default + Copy> Map3D<T> {
 }
 
 
+pub struct GenerateContext {
+    pub open_simplex: noise::OpenSimplex,
+}
 use nalgebra as na;
 impl super::displaced_chunks::ChunkData for Map3D<u16> {
     fn allocate() -> Self {
@@ -66,8 +77,13 @@ impl super::displaced_chunks::ChunkData for Map3D<u16> {
     }
 
     fn initialize(&mut self, world_chunk_coords: na::Vector3<i32>) {
+        let open_simplex = noise::OpenSimplex::new();
+        let generate_context = GenerateContext {
+            open_simplex
+        };
+        // println!("{}", min);
         self.set_all(
-            &(|coords| super::fill_voxel(coords, world_chunk_coords))
+            &(|coords| super::fill_voxel(coords, world_chunk_coords, &generate_context))
         );
     }
 }

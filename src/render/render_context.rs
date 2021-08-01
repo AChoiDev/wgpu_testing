@@ -1,5 +1,8 @@
-use crate::map_3D::Map3D;
+use crate::{map_3D::Map3D, standard_voxel_prefab::StandardVoxelPrefab};
 use nalgebra as na;
+use wgpu::Extent3d;
+
+use super::resources::{ChunkIDVariant};
 
 
 #[allow(dead_code)]
@@ -20,11 +23,17 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
-    pub fn new(window: &winit::window::Window) 
+    pub fn new(window: &winit::window::Window, partition_count: u32) 
     -> Self {
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
         let surface = unsafe { instance.create_surface(window) };
+        let prefabs = vec![
+            StandardVoxelPrefab::new("resources/bricks.vox"),
+            StandardVoxelPrefab::new("resources/inscribed stone.vox"),
+            StandardVoxelPrefab::new("resources/ridged_stone.vox")
+        ];
+        // let voxel_prefab_brick = ;
 
     let adapter = 
         futures::executor::block_on(
@@ -62,7 +71,7 @@ impl RenderContext {
     let bind_group_layouts = super::bind_group_layouts::BindGroupLayouts::new(&device);
 
         
-    let resources = super::resources::Resources::new(&device);
+    let resources = super::resources::Resources::new(&device, partition_count, prefabs.len() as u32);
        
     
     let pipelines = 
@@ -79,6 +88,7 @@ impl RenderContext {
     let imgui_renderer =
         super::imgui::ImguiRenderer::new(&queue, &device, &swapchain_descriptor, &window);
 
+        let mut rc = 
         Self {
             instance,
             device,
@@ -90,6 +100,50 @@ impl RenderContext {
             pipelines,
             resources,
             imgui_renderer,
+        };
+
+        rc.init_prefabs(prefabs);
+
+        rc
+    }
+
+
+    pub fn init_prefabs(&mut self, prefabs: Vec<StandardVoxelPrefab>) {
+
+        let mega_palette: Vec<u32> = prefabs.iter().flat_map(|p| p.palette.iter()).map(|v| *v).collect();
+        // for (i, c) in mega_palette.iter().enumerate() {
+            // println!("{}: {:b}", i, c);
+        // }
+
+        self.queue.write_texture(
+            self.resources.palette_texture_copy_view(),
+            unsafe {mega_palette[..].align_to().1},
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: 256 * 4,
+                rows_per_image: prefabs.len() as u32
+            },
+            wgpu::Extent3d {
+                width: 256,
+                height: prefabs.len() as u32,
+                depth: 1
+            }
+        );
+
+
+
+        for (i, prefab) in prefabs.into_iter().enumerate() {
+            let mut encoder = 
+                self.device.create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor {
+                        label: None,
+                    }
+            );
+            // if i > 0 {
+                // continue;
+            // }
+            self.upload_prefab(&mut encoder, prefab, i as u32);
+            self.queue.submit(Some(encoder.finish()));
         }
     }
 
@@ -110,7 +164,7 @@ impl RenderContext {
         render_desc.map_data
         .iter()
         .for_each(|m|
-            self.upload_index_map(m.0 as u32, m.1)
+            self.upload_index_map(ChunkIDVariant::PartitionID(m.0 as u32), m.1)
         );
 
         assert!(render_desc.map_data.len() < 2);
@@ -118,7 +172,7 @@ impl RenderContext {
 
         // write layer index map
         self.queue.write_texture(
-            self.resources.layer_index_map_texture_copy_view(),
+            self.resources.map_texture_copy_view_reserved(),
             unsafe {render_desc.layer_index_data[..].align_to().1},
             wgpu::TextureDataLayout {
                 offset: 0,
@@ -132,7 +186,6 @@ impl RenderContext {
             }
         );
 
-
         // upload once-per-frame view buffers
         {
             let data = super::shader_data::trace_frame::make_bytes(
@@ -142,9 +195,9 @@ impl RenderContext {
         }
 
         if render_desc.map_data.len() > 0 {
-            self.construct_bit_volume(&mut encoder, render_desc.map_data[0].0 as u32);
+            self.construct_bit_volume(&mut encoder,
+                super::resources::ChunkIDVariant::PartitionID(render_desc.map_data[0].0 as u32));
         }
-
 
         use super::resources::div_ceil;
 
@@ -186,9 +239,9 @@ impl RenderContext {
 
     }
 
-    fn upload_index_map(&self, displaced_partition_id: u32, map: &Map3D<u16>) {
+    fn upload_index_map(&self, chunk_id_variant: ChunkIDVariant, map: &Map3D<u16>) {
         self.queue.write_texture(
-            self.resources.map_texture_copy_view_by_index(displaced_partition_id),
+            self.resources.map_texture_copy_view_chunk_id(chunk_id_variant),
             unsafe {map.full_slice().align_to().1},
             wgpu::TextureDataLayout {
                 offset: 0,
@@ -203,12 +256,21 @@ impl RenderContext {
         )
     }
 
-    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, chunk_index: u32) {
-        // println!("{}", chunk_index);
+    pub fn upload_prefab(&self, encoder: &mut wgpu::CommandEncoder, prefab: StandardVoxelPrefab, prefab_id: u32) {
+        let variant = ChunkIDVariant::PrefabID(prefab_id);
+
+        self.upload_index_map(variant.clone(), &prefab.palette_volume);
+        self.construct_bit_volume(encoder, variant);
+    }
+
+    pub fn construct_bit_volume(&self, encoder: &mut wgpu::CommandEncoder, chunk_id_variant: ChunkIDVariant) {
+        let chunk_coords = super::resources::chunk_id_to_chunk_coords(
+            super::resources::chunk_id_variant_to_id(chunk_id_variant)
+        );
         self.queue.write_buffer(
             &self.resources.buffers.chunk_changes,
             0,
-            unsafe {[chunk_index].align_to().1}
+            unsafe {chunk_coords.align_to().1}
         );
         // Fill bit volume from initial uploaded map
         {
