@@ -1,4 +1,5 @@
-# Voxel Ray Marcher
+# Foxel Renderer 1
+
 Voxel tracer using compute shaders.
 Primary ray and single directional light ray only at this time.
 
